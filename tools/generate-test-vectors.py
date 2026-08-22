@@ -577,15 +577,20 @@ def invalid_vectors() -> list[dict]:
 
 # --------------------------------------------------------------------------
 # The HTTP authentication vectors (spec/totp-http-authentication.md,
-# "Authorization: TOTP" scheme): TOTP <type> base64(identity):base64(totp).
+# "Authorization: TOTP" scheme) - RFC 9110 auth-params:
 #
-# The whole file requires the "httpAuthentication" capability - currently
-# Hermod only; harnesses without it skip the file DECLARATIVELY (a visible
-# skip, never silence). The Basic Auth binding of the specification gets no
-# vectors here: its encoding is RFC 7617's, not ours.
+#     TOTP login="<b64>", totp="<b64>"[, tlscb=true|false]
+#
+# login/totp are mandatory (Base64 of UTF-8), tlscb is optional and
+# DEFAULTS TO TRUE (secure by default: an unbound deployment must say
+# tlscb=false explicitly). Unknown parameters are ignored, duplicates are
+# rejected. The whole file requires the "httpAuthentication" capability -
+# currently Hermod only; harnesses without it skip the file DECLARATIVELY
+# (a visible skip, never silence). The Basic Auth binding of the
+# specification gets no vectors here: its encoding is RFC 7617's, not ours.
 # --------------------------------------------------------------------------
 
-HTTP_USER       = "chargingstation-0001"
+HTTP_LOGIN      = "chargingstation-0001"
 HTTP_RAW_TOTP   = "CN63y502maVh"    # vector "defaults-mid-slot"
 HTTP_BOUND_TOTP = "gAzxPfYtmRgd"    # vector "tls-binding-sha256"
 
@@ -594,17 +599,22 @@ def b64(text: str) -> str:
     return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
 
-def http_header(username: str, totp: str, type_: int) -> str:
-    return f"TOTP {type_} {b64(username)}:{b64(totp)}"
+def http_header(login: str, totp: str, tlscb: bool) -> str:
+    # The canonical form: login and totp as quoted strings (Base64 padding
+    # "=" is not a token character), tlscb omitted at its default (true).
+    header = f'TOTP login="{b64(login)}", totp="{b64(totp)}"'
+    if not tlscb:
+        header += ", tlscb=false"
+    return header
 
 
 def http_auth_vector(id_: str, description: str,
-                     username: str, totp: str, type_: int) -> dict:
+                     login: str, totp: str, tlscb: bool) -> dict:
     return {
         "id":           id_,
         "description":  description,
-        "input":        {"username": username, "totp": totp, "type": type_},
-        "expected":     {"header": http_header(username, totp, type_)}
+        "input":        {"login": login, "totp": totp, "tlscb": tlscb},
+        "expected":     {"header": http_header(login, totp, tlscb)}
     }
 
 
@@ -612,96 +622,164 @@ def http_auth_vectors() -> list[dict]:
 
     return [
 
-        http_auth_vector("raw-defaults",
-                         "A raw token (type 0) for a plain ASCII identity.",
-                         HTTP_USER, HTTP_RAW_TOTP, 0),
+        http_auth_vector("raw-token",
+                         "A raw token must say so: tlscb defaults to true, so tlscb=false is explicit.",
+                         HTTP_LOGIN, HTTP_RAW_TOTP, False),
 
         http_auth_vector("tls-channel-bound",
-                         "A TLS-channel-bound token (type 1).",
-                         HTTP_USER, HTTP_BOUND_TOTP, 1),
+                         "The canonical bound form omits tlscb - true is the default (secure by default).",
+                         HTTP_LOGIN, HTTP_BOUND_TOTP, True),
 
-        http_auth_vector("username-with-colon",
-                         "Identity and token are Base64-encoded separately, so a colon in the "
-                         "identity - HTTP Basic Auth's classic ambiguity - is harmless.",
-                         "EVSE:DE*GEF*E1234*1", HTTP_RAW_TOTP, 0),
+        http_auth_vector("login-with-colon",
+                         "Login and token are Base64-encoded separately, so a colon in the "
+                         "login - HTTP Basic Auth's classic ambiguity - is harmless.",
+                         "EVSE:DE*GEF*E1234*1", HTTP_RAW_TOTP, False),
 
-        http_auth_vector("username-utf8",
-                         "A non-ASCII identity is UTF-8 encoded before Base64.",
-                         "Ladesäule-Süd-01", "SLuwWQOYh3g0", 0),
+        http_auth_vector("login-utf8",
+                         "A non-ASCII login is UTF-8 encoded before Base64.",
+                         "Ladesäule-Süd-01", "SLuwWQOYh3g0", False),
 
         http_auth_vector("short-token",
                          "A six character token (the OCPP minimum length).",
-                         HTTP_USER, "Ik0dNs", 0),
+                         HTTP_LOGIN, "Ik0dNs", False),
 
     ]
 
 
 def http_parse_vectors() -> list[dict]:
 
+    login_q = f'login="{b64(HTTP_LOGIN)}"'
+    raw_q   = f'totp="{b64(HTTP_RAW_TOTP)}"'
+    bound_q = f'totp="{b64(HTTP_BOUND_TOTP)}"'
+
+    def parses(id_: str, description: str, header: str,
+               login: str, totp: str, tlscb: bool) -> dict:
+        return {
+            "id":           id_,
+            "description":  description,
+            "header":       header,
+            "expected":     {"login": login, "totp": totp, "tlscb": tlscb}
+        }
+
     return [
-        {
-            "id":           "scheme-lowercase",
-            "description":  "The scheme name is matched case-insensitively.",
-            "header":       f"totp 0 {b64(HTTP_USER)}:{b64(HTTP_RAW_TOTP)}",
-            "expected":     {"username": HTTP_USER, "totp": HTTP_RAW_TOTP, "type": 0}
-        },
-        {
-            "id":           "scheme-mixed-case",
-            "description":  "The scheme name is matched case-insensitively.",
-            "header":       f"tOtP 1 {b64(HTTP_USER)}:{b64(HTTP_BOUND_TOTP)}",
-            "expected":     {"username": HTTP_USER, "totp": HTTP_BOUND_TOTP, "type": 1}
-        },
+
+        parses("scheme-lowercase",
+               "The scheme name is matched case-insensitively.",
+               f'totp {login_q}, {raw_q}, tlscb=false',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("scheme-mixed-case",
+               "The scheme name is matched case-insensitively.",
+               f'tOtP {login_q}, {bound_q}',
+               HTTP_LOGIN, HTTP_BOUND_TOTP, True),
+
+        parses("explicit-tlscb-true",
+               "tlscb=true is the spelled-out default.",
+               f'TOTP {login_q}, {bound_q}, tlscb=true',
+               HTTP_LOGIN, HTTP_BOUND_TOTP, True),
+
+        parses("tlscb-value-case-insensitive",
+               "The tlscb value is matched case-insensitively.",
+               f'TOTP {login_q}, {raw_q}, tlscb=FALSE',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("tlscb-quoted",
+               "Auth-param values may use the quoted-string form.",
+               f'TOTP {login_q}, {raw_q}, tlscb="false"',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("parameter-order-insensitive",
+               "Auth-params are unordered.",
+               f'TOTP {raw_q}, tlscb=false, {login_q}',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("unknown-parameter-ignored",
+               "Unknown auth-params MUST be ignored - the standard extension point.",
+               f'TOTP {login_q}, {raw_q}, tlscb=false, foo="bar"',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("token-form-value",
+               "A Base64 value without padding is a valid token and may come unquoted.",
+               f'TOTP {login_q}, totp={b64(HTTP_RAW_TOTP)}, tlscb=false',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
+        parses("whitespace-around-separators",
+               'Optional whitespace around "=" and "," is accepted.',
+               f'TOTP login = "{b64(HTTP_LOGIN)}" , {raw_q} ,tlscb=false',
+               HTTP_LOGIN, HTTP_RAW_TOTP, False),
+
     ]
 
 
 def http_invalid_headers() -> list[dict]:
 
-    cred = f"{b64(HTTP_USER)}:{b64(HTTP_RAW_TOTP)}"
+    login_q = f'login="{b64(HTTP_LOGIN)}"'
+    raw_q   = f'totp="{b64(HTTP_RAW_TOTP)}"'
 
     def bad(id_: str, description: str, header: str) -> dict:
         return {"id": id_, "description": description, "header": header}
 
     return [
 
-        bad("missing-type-digit",
-            "The type digit is mandatory.",
-            f"TOTP {cred}"),
+        bad("missing-login",
+            "The login parameter is mandatory.",
+            f'TOTP {raw_q}'),
 
-        bad("colon-separated-type",
-            "The colon-separated type of an earlier draft is not the format.",
-            f"TOTP 1:{cred}"),
+        bad("missing-totp",
+            "The totp parameter is mandatory.",
+            f'TOTP {login_q}'),
 
-        bad("unknown-type-digit",
-            "Only the type digits 0 and 1 exist.",
-            f"TOTP 2 {cred}"),
+        bad("empty-login",
+            "An empty login is rejected.",
+            f'TOTP login="", {raw_q}'),
 
-        bad("type-without-credentials",
-            "A type digit alone is not a credential.",
-            "TOTP 1"),
+        bad("duplicate-login",
+            "Duplicate parameters are ambiguous and rejected.",
+            f'TOTP {login_q}, {login_q}, {raw_q}'),
 
-        bad("missing-colon",
-            "The credential must contain base64(identity):base64(totp).",
-            f"TOTP 0 {b64(HTTP_USER)}"),
+        bad("duplicate-totp",
+            "Duplicate parameters are ambiguous and rejected.",
+            f'TOTP {login_q}, {raw_q}, {raw_q}'),
 
-        bad("three-segments",
-            "Exactly one colon separates identity and token.",
-            "TOTP 0 YQ==:YQ==:YQ=="),
+        bad("duplicate-tlscb",
+            "Duplicate parameters are ambiguous and rejected.",
+            f'TOTP {login_q}, {raw_q}, tlscb=false, tlscb=true'),
 
-        bad("extra-parameter",
-            "Nothing follows the credential.",
-            f"TOTP 0 {cred} extra"),
+        bad("tlscb-invalid-value",
+            "tlscb is a boolean.",
+            f'TOTP {login_q}, {raw_q}, tlscb=maybe'),
 
-        bad("username-not-base64",
-            "The identity segment must be valid Base64.",
-            f"TOTP 0 not-base64!:{b64(HTTP_RAW_TOTP)}"),
+        bad("login-not-base64",
+            "The login value must be valid Base64.",
+            f'TOTP login="not-base64!", {raw_q}'),
 
         bad("totp-not-base64",
-            "The token segment must be valid Base64.",
-            f"TOTP 0 {b64(HTTP_USER)}:not-base64!"),
+            "The totp value must be valid Base64.",
+            f'TOTP {login_q}, totp="not-base64!"'),
+
+        bad("unterminated-quote",
+            "A quoted-string must be closed.",
+            f'TOTP login="{b64(HTTP_LOGIN)}'),
+
+        bad("abandoned-type-digit-form",
+            "The whitespace-separated type digit of an earlier draft is not the format.",
+            f'TOTP 0 {b64(HTTP_LOGIN)}:{b64(HTTP_RAW_TOTP)}'),
+
+        bad("abandoned-colon-type-form",
+            "The colon-separated type of an earlier draft is not the format.",
+            f'TOTP 1:{b64(HTTP_LOGIN)}:{b64(HTTP_RAW_TOTP)}'),
+
+        bad("abandoned-two-segment-form",
+            "The typeless two-segment form of an earlier draft is not the format.",
+            f'TOTP {b64(HTTP_LOGIN)}:{b64(HTTP_RAW_TOTP)}'),
+
+        bad("bare-token68-blob",
+            "A single token68-style blob is not auth-params.",
+            f'TOTP {b64(HTTP_LOGIN)}'),
 
         bad("wrong-scheme",
             "A different authentication scheme is not ours to parse.",
-            f"Basic 0 {cred}"),
+            f'Basic {login_q}, {raw_q}'),
 
         bad("empty",
             "An empty header value is rejected.",
@@ -752,13 +830,15 @@ def build_files() -> dict[Path, str]:
         VECTORS_DIR / "totp-http-auth-vectors.json": render({
             "$comment":       header["$comment"],
             "specification":  SPEC_NAME_HTTP,
-            "description":    "The 'Authorization: TOTP' scheme: TOTP <type> "
-                              "base64(identity):base64(totp). 'vectors' round-trip "
-                              "(build the header from the input AND parse it back), "
-                              "'parseVectors' are parse-only leniency cases, "
-                              "'invalidHeaders' MUST be rejected by parsers. The whole "
-                              "file requires the listed capabilities; harnesses without "
-                              "them skip it declaratively.",
+            "description":    "The 'Authorization: TOTP' scheme as RFC 9110 auth-params: "
+                              "TOTP login=\"<b64>\", totp=\"<b64>\"[, tlscb=true|false]. "
+                              "login/totp are mandatory Base64 of UTF-8; tlscb is "
+                              "optional and defaults to TRUE; unknown parameters are "
+                              "ignored, duplicates rejected. 'vectors' round-trip (build "
+                              "the canonical header AND parse it back), 'parseVectors' "
+                              "are parse-only leniency cases, 'invalidHeaders' MUST be "
+                              "rejected by parsers. The whole file requires the listed "
+                              "capabilities; harnesses without them skip it declaratively.",
             "requires":       ["httpAuthentication"],
             "vectors":        http_auth_vectors(),
             "parseVectors":   http_parse_vectors(),

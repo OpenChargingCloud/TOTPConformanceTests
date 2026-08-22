@@ -289,6 +289,14 @@ direction.
    configuration, not negotiated in-band; both ends must be configured
    identically. There is no way to signal the algorithm inside a token.
  * **SHA-1 and MD5** are rejected by name (section 5) and MUST NOT be added.
+ * **The clock is a security boundary.** Every guarantee of this format is
+   time-boxed: a token expires only if the verifier's clock actually moves
+   on. An attacker who can shift a peer's clock — classic unauthenticated
+   NTP is trivially spoofable on-path — can resurrect expired tokens,
+   pre-compute future ones against a generator, or deny service by pushing
+   clocks apart. Generators and verifiers SHOULD therefore obtain time from
+   an **authenticated source**; we strongly RECOMMEND Network Time Security
+   ([RFC 8915]) for NTP ([RFC 5905]) deployments.
 
 ### 8.1. Known-answer material
 
@@ -327,13 +335,17 @@ tracked per vector under `knownDeviations` and documented in
  * [RFC 2104] — HMAC: Keyed-Hashing for Message Authentication
  * [RFC 2119] / [RFC 8174] — Key words for use in RFCs
  * [RFC 4226] — HOTP: An HMAC-Based One-Time Password Algorithm
+ * [RFC 5905] — Network Time Protocol Version 4
  * [RFC 6238] — TOTP: Time-Based One-Time Password Algorithm
  * [RFC 8446] — The Transport Layer Security (TLS) Protocol Version 1.3
+ * [RFC 8915] — Network Time Security for the Network Time Protocol
  * [OCPP 2.1] — Open Charge Point Protocol 2.1 Edition 2, Part 2 -
    Specification, Open Charge Alliance, 2025 (use case C25, "TOTP algorithm,
    version 1", component `WebPaymentsCtrlr`)
 
 [RFC 2104]: https://www.rfc-editor.org/rfc/rfc2104
+[RFC 5905]: https://www.rfc-editor.org/rfc/rfc5905
+[RFC 8915]: https://www.rfc-editor.org/rfc/rfc8915
 [OCPP 2.1]: https://openchargealliance.org/protocols/open-charge-point-protocol/
 [RFC 2119]: https://www.rfc-editor.org/rfc/rfc2119
 [RFC 4226]: https://www.rfc-editor.org/rfc/rfc4226

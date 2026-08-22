@@ -144,9 +144,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
     public sealed class HttpAuthTriple
     {
-        public String  Username  { get; set; } = "";
-        public String  Totp      { get; set; } = "";
-        public Int32   Type      { get; set; }
+        public String   Login  { get; set; } = "";
+        public String   Totp   { get; set; } = "";
+        public Boolean  Tlscb  { get; set; }
     }
 
     public sealed class HttpAuthExpected

@@ -39,13 +39,19 @@ Each vector: `input` → expected `previous`/`current`/`next` token and
 ## totp-http-auth-vectors.json — the "Authorization: TOTP" scheme
 
 Vectors for the HTTP authentication binding
-([spec/totp-http-authentication.md](../spec/totp-http-authentication.md)):
-`TOTP <type> base64(identity):base64(totp)`.
+([spec/totp-http-authentication.md](../spec/totp-http-authentication.md)) as
+RFC 9110 auth-params:
+`TOTP login="<b64>", totp="<b64>"[, tlscb=true|false]` — `login`/`totp`
+mandatory (Base64 of UTF-8), `tlscb` optional with default **true**.
 
- * `vectors` — credential building (identity, token, type digit → the exact
-   header value); harnesses also parse the header back (round-trip).
- * `parseVectors` — parse-only leniency cases (scheme case-insensitivity).
- * `invalidHeaders` — header values parsers MUST reject.
+ * `vectors` — credential building (login, token, binding flag → the exact
+   canonical header value); harnesses also parse the header back
+   (round-trip).
+ * `parseVectors` — parse-only leniency cases: scheme and value casing,
+   parameter order, `tlscb` defaulting and quoting, the unknown-parameter
+   must-ignore rule, token-form values.
+ * `invalidHeaders` — header values parsers MUST reject (duplicates,
+   missing mandatory parameters, the wire forms of earlier drafts).
 
 The **whole file** carries a top-level `requires` list (currently
 `httpAuthentication` — Hermod only). A harness whose implementation lacks a

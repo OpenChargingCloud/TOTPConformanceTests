@@ -30,10 +30,12 @@ namespace cloud.charging.open.TOTP.Conformance.tests
     /// <summary>
     /// Runs Hermod's HTTPTOTPAuthentication against the canonical HTTP
     /// authentication vectors in TestVectors/totp-http-auth-vectors.json -
-    /// the "Authorization: TOTP" scheme of spec/totp-http-authentication.md:
-    /// "TOTP" SP type digit SP base64(identity):base64(totp). Build vectors
-    /// round-trip in both directions, parse vectors pin leniency (scheme
-    /// case-insensitivity), invalid headers MUST be rejected.
+    /// the "Authorization: TOTP" scheme of spec/totp-http-authentication.md
+    /// as RFC 9110 auth-params: TOTP login="&lt;b64&gt;", totp="&lt;b64&gt;"
+    /// [, tlscb=true|false], with tlscb defaulting to TRUE. Build vectors
+    /// round-trip in both directions, parse vectors pin leniency (scheme and
+    /// value casing, parameter order, unknown-parameter must-ignore, token
+    /// vs quoted-string form), invalid headers MUST be rejected.
     /// </summary>
     [TestFixture]
     public class HttpAuthVectorTests
@@ -41,13 +43,11 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
         #region (static) Vector sources
 
-        private static TOTPHTTPHeaderType AsType(Int32 Type)
+        private static TOTPHTTPHeaderType AsType(Boolean Tlscb)
 
-            => Type switch {
-                   0  => TOTPHTTPHeaderType.RAW,
-                   1  => TOTPHTTPHeaderType.TLSChannelBinding,
-                   _  => throw new ArgumentException($"Unknown TOTP type '{Type}' in the vector file!")
-               };
+            => Tlscb
+                   ? TOTPHTTPHeaderType.TLSChannelBinding
+                   : TOTPHTTPHeaderType.RAW;
 
         public static IEnumerable<TestCaseData> BuildVectors()
             => VectorFiles.HttpAuth.Vectors       .Select(vector => new TestCaseData(vector).SetArgDisplayNames(vector.Id));
@@ -96,9 +96,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         {
 
             var auth = HTTPTOTPAuthentication.Create(
-                           Vector.Input.Username,
+                           Vector.Input.Login,
                            Vector.Input.Totp,
-                           AsType(Vector.Input.Type)
+                           AsType(Vector.Input.Tlscb)
                        );
 
             Assert.That(auth.HTTPText, Is.EqualTo(Vector.Expected.Header), "build");
@@ -108,9 +108,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
                         "The built header must parse again!");
 
             Assert.Multiple(() => {
-                Assert.That(parsed?.Username,  Is.EqualTo(Vector.Input.Username));
-                Assert.That(parsed?.TOTP,      Is.EqualTo(Vector.Input.Totp));
-                Assert.That(parsed?.Type,      Is.EqualTo(AsType(Vector.Input.Type)));
+                Assert.That(parsed?.Login,  Is.EqualTo(Vector.Input.Login));
+                Assert.That(parsed?.TOTP,   Is.EqualTo(Vector.Input.Totp));
+                Assert.That(parsed?.Type,   Is.EqualTo(AsType(Vector.Input.Tlscb)));
             });
 
         }
@@ -128,9 +128,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
                         $"'{Vector.Header}' must parse!");
 
             Assert.Multiple(() => {
-                Assert.That(parsed?.Username,  Is.EqualTo(Vector.Expected.Username));
-                Assert.That(parsed?.TOTP,      Is.EqualTo(Vector.Expected.Totp));
-                Assert.That(parsed?.Type,      Is.EqualTo(AsType(Vector.Expected.Type)));
+                Assert.That(parsed?.Login,  Is.EqualTo(Vector.Expected.Login));
+                Assert.That(parsed?.TOTP,   Is.EqualTo(Vector.Expected.Totp));
+                Assert.That(parsed?.Type,   Is.EqualTo(AsType(Vector.Expected.Tlscb)));
             });
 
         }

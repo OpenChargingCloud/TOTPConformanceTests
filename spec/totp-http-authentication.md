@@ -11,10 +11,11 @@ OCPI-style `Authorization: Token …`). Three bindings are defined:
 
  * **TOTP over HTTP Basic Authentication** (section 4) — the token in
    Basic's password field: zero new wire code, the migration path;
- * the **`Authorization: TOTP` scheme** (section 5) — carries an identity
-   *and* a typed token, the native Basic replacement;
+ * the **`Authorization: TOTP` scheme** (section 5) — login and token as
+   RFC 9110 auth-params, with TLS channel binding signaled in-band
+   (`tlscb`, default **true**): the native Basic replacement;
  * the **`TOTP` request header** (section 6) — a typed token only, for
-   deployments where the peer's identity is already established.
+   deployments where the peer's login is already established.
 
 The native bindings are implemented by [Vanaheimr
 Hermod](https://github.com/Vanaheimr/Hermod); Appendix A records the
@@ -50,19 +51,22 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHOULD", "SHOULD NOT",
 [RFC 2119] and [RFC 8174] when, and only when, they appear in all capitals.
 
 *Token format spec* refers to [totp-token-format.md](totp-token-format.md).
-*Identity* is the name under which the verifier looks up a peer's TOTP
+The **login** is the name under which the verifier looks up a peer's TOTP
 configuration (shared secret, validity time, length, alphabet, hash
-algorithm — the `TOTPConfig` of token format spec Appendix B). *Base64* is
-the Base64 encoding of [RFC 4648] section 4, with padding.
+algorithm — the `TOTPConfig` of token format spec Appendix B). It is
+deliberately not called a "user": a login names a **role** — a charging
+station, a backend service, a tenant — and nothing about it implies a
+natural person. *Base64* is the Base64 encoding of [RFC 4648] section 4,
+with padding.
 
 
 ## 3. Prerequisites
 
-Client and verifier share a TOTP configuration per identity, provisioned out
-of band. The verifier maintains a mapping *identity → TOTP configuration*;
-the client knows its own identity and configuration. How the mapping is
-provisioned and rotated is out of scope (token format spec section 8 states
-the requirements on the secret itself).
+Client and verifier share a TOTP configuration per login, provisioned out of
+band. The verifier maintains a mapping *login → TOTP configuration*; the
+client knows its own login and configuration. How the mapping is provisioned
+and rotated is out of scope (token format spec section 8 states the
+requirements on the secret itself).
 
 
 ## 4. TOTP over HTTP Basic Authentication
@@ -72,10 +76,10 @@ The simplest deployment needs no new wire format at all: the client puts the
 [RFC 7617]:
 
 ```abnf
-credentials  = "Basic" SP base64( identity ":" totp )
+credentials  = "Basic" SP base64( login ":" totp )
 ```
 
-Example — identity `chargingstation-0001`, token `CN63y502maVh` (the
+Example — login `chargingstation-0001`, token `CN63y502maVh` (the
 `defaults-mid-slot` vector of the canonical test vectors):
 
 ```http
@@ -97,12 +101,12 @@ password comparison changes.
 
 **What it cannot do** — Basic is traditional, and it shows:
 
- * The identity **MUST NOT contain a `":"`** — RFC 7617 encodes
-   `identity ":" password` as one Base64 blob, so a colon in the identity is
+ * The login **MUST NOT contain a `":"`** — RFC 7617 encodes
+   `login ":" password` as one Base64 blob, so a colon in the login is
    unrepresentable (the classic Basic ambiguity).
- * There is **no type digit**, so TLS channel binding (section 6.2) cannot
-   be signaled: every Basic-carried token is a raw token.
- * Non-ASCII identities and tokens inherit RFC 7617's charset vagueness
+ * There is **no channel binding signal**: every Basic-carried token is a
+   raw token (section 6.2 does not apply).
+ * Non-ASCII logins and tokens inherit RFC 7617's charset vagueness
    (the `charset` auth-param covers only UTF-8, and support varies).
  * From the outside it stays *Basic*: intermediaries, security scanners and
    log-redaction tooling treat the credential as a static password, with all
@@ -117,43 +121,55 @@ verifier MAY accept both during a transition.
 
 ### 5.1. Syntax
 
+The credentials are a list of **auth-params** ([RFC 9110] section 11.3),
+exactly as that specification recommends for new schemes:
+
 ```abnf
-credentials  = "TOTP" SP totp-type SP totp-cred
-totp-type    = "0" / "1"
-totp-cred    = base64-user ":" base64-totp
-base64-user  = <Base64 of the UTF-8 encoded identity>
-base64-totp  = <Base64 of the UTF-8 encoded TOTP>
+credentials  = "TOTP" 1*SP #auth-param
+
+; defined parameters:
+;   login = <Base64 of the UTF-8 encoded login>          (MANDATORY)
+;   totp  = <Base64 of the UTF-8 encoded TOTP>           (MANDATORY)
+;   tlscb = "true" / "false"                             (OPTIONAL, default: true)
 ```
 
-The scheme name is matched case-insensitively. The type digit is
-**MANDATORY** and has the same semantics as in the `TOTP` request header
-(section 6.1), which puts its type digit before the value in the very same
-way: `0` for a raw token, `1` for a token bound to this TLS session
-(section 6.2). Verifiers MUST reject credentials without a type digit and
-credentials whose type digit is neither `0` nor `1`. `totp-cred` is a
-single whitespace-free parameter; Base64 never contains a `":"`, so its
-split is unambiguous.
+ * The scheme name and all parameter names are matched case-insensitively;
+   parameters are unordered.
+ * `login` and `totp` are MANDATORY. Senders MUST use the quoted-string
+   form for them — Base64 padding (`=`) is not a `token` character;
+   recipients MUST also accept the token form where it is syntactically
+   valid (unpadded Base64).
+ * `tlscb` says whether the token is bound to this TLS session (section
+   6.2). It is OPTIONAL and **defaults to `true`** — secure by default: a
+   credential that says nothing about binding claims the strong mode, and
+   a deployment sending raw tokens must say `tlscb=false` explicitly.
+   Senders SHOULD omit `tlscb` when it is `true`. The value is matched
+   case-insensitively, in token or quoted-string form.
+ * Recipients MUST ignore unknown parameters — the standard auth-param
+   extension point. Duplicate parameters, missing mandatory parameters,
+   invalid Base64 and invalid `tlscb` values are rejected as malformed
+   (section 8).
 
-Example — identity `chargingstation-0001`, raw token `CN63y502maVh` (the
+Example — login `chargingstation-0001`, raw token `CN63y502maVh` (the
 `defaults-mid-slot` vector of the canonical test vectors):
 
 ```http
 GET /ocpp HTTP/1.1
 Host: csms.example.com
-Authorization: TOTP 0 Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Q042M3k1MDJtYVZo
+Authorization: TOTP login="Y2hhcmdpbmdzdGF0aW9uLTAwMDE=", totp="Q042M3k1MDJtYVZo", tlscb=false
 ```
 
-The same identity with a TLS-channel-bound token (`gAzxPfYtmRgd`, the
-`tls-binding-sha256` vector):
+The same login with a TLS-channel-bound token (`gAzxPfYtmRgd`, the
+`tls-binding-sha256` vector) — the canonical form omits `tlscb`:
 
 ```http
-Authorization: TOTP 1 Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Z0F6eFBmWXRtUmdk
+Authorization: TOTP login="Y2hhcmdpbmdzdGF0aW9uLTAwMDE=", totp="Z0F6eFBmWXRtUmdk"
 ```
 
-Unlike Basic Authentication — which Base64-encodes `user:password` as one
-string and therefore cannot represent a `":"` inside the username ([RFC
-7617] section 2) — identity and token are encoded **separately** here, so
-both may contain any Unicode character, including `":"`.
+Unlike Basic Authentication — which Base64-encodes `login:password` as one
+string and therefore cannot represent a `":"` inside the login ([RFC 7617]
+section 2) — login and token are encoded **separately** here, so both may
+contain any Unicode character, including `":"`.
 
 ### 5.2. Client behaviour
 
@@ -166,20 +182,21 @@ clients MUST NOT send a cached token beyond that.
 
 On receiving the header, the verifier:
 
-1. Reads the type digit and splits `totp-cred` at the `":"` into exactly
-   two segments, which are Base64-decoded and UTF-8-decoded into identity
-   and presented token. A missing or unknown type digit, malformed
-   encodings and any other segment count are rejected as malformed
-   (section 8).
-2. Looks up the TOTP configuration for the identity. An unknown identity is
+1. Parses the auth-params: unknown parameters are ignored; duplicate
+   parameters, a missing `login` or `totp`, invalid Base64 and an invalid
+   `tlscb` value are rejected as malformed (section 8). `login` and `totp`
+   are Base64-decoded and UTF-8-decoded; `tlscb` defaults to `true` when
+   absent.
+2. Looks up the TOTP configuration for the login. An unknown login is
    rejected exactly like a wrong token (section 8).
 3. Computes `previous`, `current` and `next` for its own clock and the
-   identity's configuration — for type `1` with the exporter material of the
-   receiving TLS session applied on the verifier's side as well, under the
-   rules of section 6.2 — and accepts iff the presented token equals one
-   of the three: the acceptance window of token format spec section 7,
-   including its guidance: constant-time comparison, no widening of the
-   window, single-use enforcement and rate limiting where replay matters.
+   login's configuration — with `tlscb=true` (explicit or by default) the
+   exporter material of the receiving TLS session is applied on the
+   verifier's side as well, under the rules of section 6.2 — and accepts
+   iff the presented token equals one of the three: the acceptance window
+   of token format spec section 7, including its guidance: constant-time
+   comparison, no widening of the window, single-use enforcement and rate
+   limiting where replay matters.
 
 Requests without an `Authorization` header, and requests that fail
 verification, are answered with `401 Unauthorized`; the response SHOULD
@@ -197,10 +214,14 @@ The `realm` parameter is OPTIONAL and follows [RFC 9110] section 11.
 
 ### 6.1. Syntax
 
-For deployments where the peer's identity is already established — a mutual
+For deployments where the peer's login is already established — a mutual
 TLS connection, a per-client URL path, an already-authenticated session —
 the token travels in a dedicated request header, prefixed with a one-digit
-**type**:
+**type**. This binding descends from the proprietary `Token`-style
+authentication familiar from e-mobility protocols such as OCPI
+(`Authorization: Token <static-token>`): the same lightweight shape, except
+that the token now exchanges itself every validity interval instead of
+being a static, long-lived secret.
 
 ```abnf
 TOTP-header  = "TOTP:" OWS totp-type SP totp-value OWS
@@ -225,28 +246,28 @@ TOTP: 1 gAzxPfYtmRgd
 
 Verifiers MUST reject unknown type digits.
 
-### 6.2. Type `1`: TLS v1.3 channel binding
+### 6.2. TLS v1.3 channel binding
 
-A type `1` token is derived with TLS exporter material per token format spec
+A bound token is derived with TLS exporter material per token format spec
 section 6 (label `EXPORTER-Time-Based-One-Time-Password-v1`, empty context,
 32 bytes RECOMMENDED). The verifier derives the **same** material from its
 own side of the TLS connection the request arrived on, and verifies against
-tokens computed with it. A captured type `1` token is useless on any other
+tokens computed with it. A captured bound token is useless on any other
 connection, which makes replay impractical even if the token leaks into a
 log.
 
-Type `1` MUST only be used on TLS v1.3 (or newer) connections — earlier TLS
-versions have no exporter interface with these properties. A verifier that
-cannot derive exporter material for the receiving connection MUST reject a
-type `1` token; it MUST NOT fall back to verifying it as type `0`.
+Channel binding MUST only be used on TLS v1.3 (or newer) connections —
+earlier TLS versions have no exporter interface with these properties. A
+verifier that cannot derive exporter material for the receiving connection
+MUST reject a bound token; it MUST NOT fall back to verifying it as raw.
 
-These rules apply to type `1` in **either** native binding — the `TOTP`
-request header and the `Authorization: TOTP` scheme (section 5.1) carry the
-same type semantics.
+These rules apply to channel binding in **either** native binding: the
+`TOTP` request header signals it with type digit `1`, the
+`Authorization: TOTP` scheme with `tlscb` absent or `true` (section 5.1).
 
 ### 6.3. Verification
 
-As in section 5.3, steps 2–3, with the identity taken from the connection
+As in section 5.3, steps 2–3, with the login taken from the connection
 context instead of the header, and — for type `1` — the exporter material of
 the receiving TLS session applied to the token derivation on the verifier's
 side as well.
@@ -279,16 +300,17 @@ plays its other role, in dynamic QR codes (token format spec section 1.2).
 
 ## 8. Error handling
 
- * Syntactically malformed credentials (bad Base64, missing `":"`, missing
-   or unknown type digit, empty token): `400 Bad Request` — or `401` as
-   below; a server MAY treat malformed as failed.
- * Failed verification and unknown identities: `401 Unauthorized`. The
-   response MUST NOT distinguish "unknown identity" from "wrong token"
-   (identity enumeration).
+ * Syntactically malformed credentials (bad Base64, a missing mandatory
+   parameter, duplicate parameters, an invalid `tlscb` value, an unknown
+   type digit, an empty token): `400 Bad Request` — or `401` as below; a
+   server MAY treat malformed as failed.
+ * Failed verification and unknown logins: `401 Unauthorized`. The
+   response MUST NOT distinguish "unknown login" from "wrong token"
+   (login enumeration).
  * Servers SHOULD NOT write presented tokens to logs. A leaked raw token
    dies with its slot, but log lines outlive validity windows and reveal
-   token length and alphabet; a leaked type `1` token is harmless, which is
-   one more reason to prefer it.
+   token length and alphabet; a leaked bound token is harmless, which is
+   one more reason to prefer channel binding.
 
 
 ## 9. Protocol considerations (RFC 9110 §16.4.2)
@@ -298,49 +320,46 @@ schemes. This scheme is private-use (see the third point), but answers them
 anyway:
 
  * **Statelessness.** Every request carries everything the verifier needs:
-   identity, type and token. Verification requires only the verifier's
-   clock and the provisioned identity → configuration mapping (section 3) —
-   no per-client session state. Two deliberate exceptions: the OPTIONAL
-   single-use enforcement of section 5.3 (anti-replay) is server state
-   bounded to one validity slot per accepted token, and a type `1` token
-   binds to the **TLS session** it was derived for (section 6.2) —
-   transport state, by design, never application session state.
+   login, token and the binding flag. Verification requires only the
+   verifier's clock and the provisioned login → configuration mapping
+   (section 3) — no per-client session state. Two deliberate exceptions:
+   the OPTIONAL single-use enforcement of section 5.3 (anti-replay) is
+   server state bounded to one validity slot per accepted token, and a
+   bound token binds to the **TLS session** it was derived for (section
+   6.2) — transport state, by design, never application session state.
 
  * **The `realm` parameter** keeps exactly its [RFC 9110] section 11.5
    protection-space semantics; this document does not reinterpret it. The
-   identity → configuration mapping is scoped per protection space, and a
+   login → configuration mapping is scoped per protection space, and a
    client MAY send credentials preemptively for further requests within a
    protection space it has already authenticated against.
 
- * **token68 / auth-param.** The *challenge* direction is standard: `realm`
-   — and any future challenge parameter — uses the auth-param syntax. The
-   *credentials* deliberately use neither `token68` nor auth-params but the
-   fixed two-parameter form of section 5.1: compact, and symmetric with the
-   `TOTP` request header. That deviates from the "new schemes ought to use
-   auth-param" advice — acceptable for a private-use scheme whose name
-   `TOTP` is **not** registered in the IANA HTTP Authentication Scheme
-   Registry. Generic HTTP libraries treating the credentials as opaque is
-   expected and fine. Should IANA registration ever be pursued, the
-   credentials would migrate to auth-param syntax (e.g.
-   `TOTP type=1, id="…", totp="…"`).
+ * **token68 / auth-param.** Both directions are conformant: the challenge
+   uses auth-params (`realm`), and the credentials use the auth-param
+   syntax exactly as section 16.4.2 recommends for new schemes — an IANA
+   registration would need no syntactic migration. The scheme name `TOTP`
+   is nevertheless **not** registered in the IANA HTTP Authentication
+   Scheme Registry yet; until it is, this stays a private-use scheme
+   between consenting implementations.
 
- * **Unknown parameters.** In *credentials*: **must-reject** — anything
-   beyond the grammar of section 5.1 fails parsing (the `extra-parameter`
-   entry of the invalid-header vectors pins this). A closed grammar fails
-   closed; for an authentication scheme, ambiguity is worse than
-   inflexibility. Extensibility lives in the **type digit** (`0` and `1`
-   today; future revisions of this document may define further digits), not
-   in ignorable parameters. In *challenges*: clients MUST ignore unknown
-   auth-params, as [RFC 9110] already requires.
+ * **Unknown parameters.** In *credentials*: recipients MUST ignore
+   parameters they do not recognize — the standard auth-param extension
+   point, and the route future extensions of this scheme will take.
+   Ambiguity still fails closed: duplicate parameters and missing
+   mandatory parameters are rejected. (The `TOTP` request header of
+   section 6 has no parameters; its extension point is the type digit.)
+   In *challenges*: clients MUST ignore unknown auth-params, as
+   [RFC 9110] already requires.
 
  * **Origin-server and proxy authentication.** The scheme is designed for
    origin-server authentication (`401` / `WWW-Authenticate` /
    `Authorization`). It MAY be used for proxy authentication (`407` /
-   `Proxy-Authenticate` / `Proxy-Authorization`) with type `0` tokens,
-   where the proxy holds the identity's configuration. Type `1` is only
-   meaningful when the verifier is the TLS endpoint of the connection
-   carrying the request — with classic CONNECT tunneling a proxy is not,
-   so type `1` MUST NOT be used for proxy authentication there.
+   `Proxy-Authenticate` / `Proxy-Authorization`) with raw tokens
+   (`tlscb=false`), where the proxy holds the login's configuration.
+   Channel binding is only meaningful when the verifier is the TLS
+   endpoint of the connection carrying the request — with classic CONNECT
+   tunneling a proxy is not, so bound tokens MUST NOT be used for proxy
+   authentication there.
 
  * **Caching.** For the Basic binding and the `Authorization: TOTP` scheme
    the credentials travel in the `Authorization` header field, which HTTP
@@ -352,17 +371,25 @@ anyway:
 
 ## 10. Security considerations
 
- * **TLS is REQUIRED** for the Basic binding, the `Authorization: TOTP`
-   scheme and type `0` of the `TOTP` header: a raw token is replayable
-   within its acceptance window by anyone who observes it. (This is still a
-   categorical improvement over classic Basic Auth, where observation
-   compromises the credential *permanently*.) Type `1` is self-protecting
-   against replay, but the identity and everything else in the request
-   still deserve TLS.
+ * **TLS is REQUIRED** for the Basic binding, and for raw tokens
+   (`tlscb=false` / type `0`) in the native bindings: a raw token is
+   replayable within its acceptance window by anyone who observes it.
+   (This is still a categorical improvement over classic Basic Auth, where
+   observation compromises the credential *permanently*.) A bound token is
+   self-protecting against replay, but the login and everything else in
+   the request still deserve TLS.
+ * **The verifier's clock is a security boundary.** Every guarantee in
+   this document is time-boxed: a token "dies with its slot" only if the
+   verifier's clock actually moves on. An attacker who can shift that
+   clock — classic unauthenticated NTP is trivially spoofable on-path —
+   can resurrect expired tokens, pre-date captured ones, or push the clock
+   forward to deny service. Verifiers (and generators) SHOULD therefore
+   obtain time from an **authenticated source**; we strongly RECOMMEND
+   Network Time Security ([RFC 8915]) for NTP ([RFC 5905]) deployments.
  * The full guidance of token format spec sections 7 and 8 applies:
-   constant-time comparison, single-use enforcement per (identity, slot,
-   token) where replay matters, rate limiting of failed attempts, clock
-   synchronization, and randomly generated secrets of at least 128 bits.
+   constant-time comparison, single-use enforcement per (login, slot,
+   token) where replay matters, rate limiting of failed attempts, and
+   randomly generated secrets of at least 128 bits.
  * Registration status, credentials grammar and caching interplay are
    protocol properties, not vulnerabilities — see section 9.
 
@@ -373,12 +400,15 @@ The `Authorization: TOTP` scheme is covered by canonical vectors:
 [`TestVectors/totp-http-auth-vectors.json`](../TestVectors/totp-http-auth-vectors.json),
 gated as a whole file by the capability **`httpAuthentication`**:
 
- * `vectors` — credential building: identity, token and type digit in,
-   the exact header value out; harnesses also parse the header back and
-   compare (round-trip).
- * `parseVectors` — parse-only leniency cases (scheme case-insensitivity).
- * `invalidHeaders` — header values parsers MUST reject, including the
-   draft forms this document abandoned.
+ * `vectors` — credential building: login, token and binding flag in, the
+   exact canonical header value out; harnesses also parse the header back
+   and compare (round-trip).
+ * `parseVectors` — parse-only leniency cases: scheme and value casing,
+   parameter order, `tlscb` defaulting and quoting, the
+   unknown-parameter must-ignore rule, token-form values.
+ * `invalidHeaders` — header values parsers MUST reject, including
+   duplicates, missing mandatory parameters, and the wire forms of
+   earlier drafts of this document.
 
 Harnesses of implementations without the capability skip the file
 **declaratively** (a visible skip, never silence). The token values inside
@@ -388,7 +418,7 @@ come from the canonical token vectors (`defaults-mid-slot`,
 The Basic binding (section 4) gets no vectors of its own: its encoding is
 [RFC 7617]'s, not ours, and the tokens are the token format's. The `TOTP`
 request header's value is a bare token (its wire format is trivial); its
-type semantics are exercised through the scheme vectors.
+channel binding semantics are exercised through the scheme vectors.
 
 
 ## 12. References
@@ -396,18 +426,22 @@ type semantics are exercised through the scheme vectors.
  * [Token format specification](totp-token-format.md) — the tokens carried here
  * [RFC 2119] / [RFC 8174] — Key words for use in RFCs
  * [RFC 4648] — The Base16, Base32, and Base64 Data Encodings
+ * [RFC 5905] — Network Time Protocol Version 4
  * [RFC 6455] — The WebSocket Protocol
  * [RFC 7617] — The 'Basic' HTTP Authentication Scheme
  * [RFC 8446] — The Transport Layer Security (TLS) Protocol Version 1.3
+ * [RFC 8915] — Network Time Security for the Network Time Protocol
  * [RFC 9110] — HTTP Semantics
  * [RFC 9111] — HTTP Caching
 
 [RFC 2119]: https://www.rfc-editor.org/rfc/rfc2119
 [RFC 4648]: https://www.rfc-editor.org/rfc/rfc4648
+[RFC 5905]: https://www.rfc-editor.org/rfc/rfc5905
 [RFC 6455]: https://www.rfc-editor.org/rfc/rfc6455
 [RFC 7617]: https://www.rfc-editor.org/rfc/rfc7617
 [RFC 8174]: https://www.rfc-editor.org/rfc/rfc8174
 [RFC 8446]: https://www.rfc-editor.org/rfc/rfc8446
+[RFC 8915]: https://www.rfc-editor.org/rfc/rfc8915
 [RFC 9110]: https://www.rfc-editor.org/rfc/rfc9110
 [RFC 9111]: https://www.rfc-editor.org/rfc/rfc9111
 
@@ -418,10 +452,10 @@ type semantics are exercised through the scheme vectors.
 |-------|--------|---------|
 | Token derivation | yes | yes |
 | TOTP over Basic Authentication (section 4) — existing RFC 7617 machinery; only the server-side password check changes | wire: yes, verification: pending | no |
-| `Authorization: TOTP` — build & parse, incl. the mandatory type digit (`HTTPTOTPAuthentication`, vector-driven tests) | yes | no |
+| `Authorization: TOTP` — build & parse as auth-params: `login`, `totp`, `tlscb` with its true-default (`HTTPTOTPAuthentication`, vector-driven tests) | yes | no |
 | `TOTP` request header — build & parse (`TOTPHTTPHeader`), auto-attached by the HTTP client from its `TOTPConfig` | yes | no |
-| TLS exporter material (type `1` derivation) | yes | no |
-| Server-side verification against the identity → config mapping (`AWebSocketServer.ClientTOTPConfig`) | prepared, in progress | no |
+| TLS exporter material (channel binding derivation) | yes | no |
+| Server-side verification against the login → config mapping (`AWebSocketServer.ClientTOTPConfig`) | prepared, in progress | no |
 
 The server-side verification procedure of sections 5.3 and 6.3 is what this
 document exists to pin down before that code lands.
