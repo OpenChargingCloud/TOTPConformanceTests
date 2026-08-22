@@ -53,3 +53,8 @@ Hermod-only capability). Skips are load-bearing, not noise.
   implementations agree on it (generator + one harness minimum).
 - `libs/Directory.Build.props` shields the submodules from this repo's build
   settings — keep it.
+- CI gates the pinned submodules (Windows + bare debian:13 container, Hermod's
+  own two legs); `nightly.yml` instead advances the submodules to upstream
+  HEADs (`git submodule update --remote`, via `branch = master` in
+  .gitmodules) — a red night with green CI means an upstream master broke the
+  frozen format, not this repository.

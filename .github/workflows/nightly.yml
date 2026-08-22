@@ -1,0 +1,140 @@
+name: Nightly
+
+# The counterpart to ci.yml — with one deliberate difference. The gate runs against the
+# PINNED submodules, and every vector is derived from a fixed timestamp, so a nightly
+# repetition of the gate could only ever reproduce the previous run: this suite is fully
+# deterministic (TOTP.ts's nightly makes the same argument).
+#
+# What CAN move without any push to this repository are the implementations themselves.
+# This workflow therefore advances all three submodules to their upstream HEADs and runs
+# both harnesses against them. A red here without a corresponding red in CI means Hermod,
+# Styx or TOTP.ts master broke the frozen token format — the one thing this repository
+# exists to notice, preferably before a release does. Like Hermod building against Styx
+# master, that is the honest signal, and a choice, not an accident. Fatal on purpose.
+#
+# Two things worth knowing about scheduled workflows: they only ever run on the default
+# branch, and GitHub disables them after 60 days without any repository activity. If this
+# stops reporting, that is the first thing to check.
+on:
+  schedule:
+    # 03:29 UTC — off the hour (GitHub's scheduler is busiest then and delays runs by tens
+    # of minutes), and after the Hermod (02:17) and TOTP.ts (02:43) nightlies, so this run
+    # sees the same upstream HEADs those have just tested themselves.
+    - cron: '29 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  csharp-upstream:
+    name: "C# vs upstream HEADs (${{ matrix.leg }})"
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    # The same two legs as ci.yml: Windows, and Debian 13 in a bare debian:13 container.
+    # See ci.yml for why it is exactly these two.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            leg: windows-latest
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+    steps:
+
+      # FIRST, before the checkout — see ci.yml: the bare debian:13 image has no git, and
+      # without one actions/checkout falls back to a tarball on which the submodule
+      # checkout fails.
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The point of the night: leave the pinned SHAs behind. --remote follows the
+      # "branch = master" configured per submodule in .gitmodules. The step summary
+      # records which upstream HEADs this night actually tested — without it, two red
+      # nights against different HEADs would be indistinguishable.
+      - name: Advance submodules to upstream HEADs
+        shell: bash
+        run: |
+          git submodule update --remote --recursive
+          {
+            echo '## Upstream HEADs under test'
+            echo
+            echo '```'
+            git submodule status
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj --configuration Release
+
+      - name: Test
+        timeout-minutes: 15
+        run: dotnet test Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=nightly-${{ matrix.leg }}.trx" --results-directory artifacts
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-test-results-${{ matrix.leg }}
+          path: artifacts/*.trx
+
+  typescript-upstream:
+    name: "TS vs upstream HEADs (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Advance submodules to upstream HEADs
+        shell: bash
+        run: |
+          git submodule update --remote --recursive
+          {
+            echo '## Upstream HEADs under test'
+            echo
+            echo '```'
+            git submodule status
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: Tests/TOTPConformance_Tests.TS/package-lock.json
+
+      # Deliberately npm ci against the committed lock file: the only variable this night
+      # moves is the submodules, so a red points at exactly one thing. Fresh dependency
+      # resolution for the TOTP.ts library itself is its own nightly's job.
+      - name: Install
+        run: npm --prefix Tests/TOTPConformance_Tests.TS ci
+
+      - name: Test
+        run: npm --prefix Tests/TOTPConformance_Tests.TS test

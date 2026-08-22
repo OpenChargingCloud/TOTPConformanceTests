@@ -1,9 +1,12 @@
 [submodule "libs/Styx"]
 	path = libs/Styx
 	url = https://github.com/Vanaheimr/Styx.git
+	branch = master
 [submodule "libs/Hermod"]
 	path = libs/Hermod
 	url = https://github.com/Vanaheimr/Hermod.git
+	branch = master
 [submodule "libs/TOTP.TS"]
 	path = libs/TOTP.TS
 	url = https://github.com/OpenChargingCloud/TOTP.ts.git
+	branch = master

@@ -5,12 +5,21 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  # Manual runs from the Actions tab ("Run workflow"), same as nightly.yml.
   workflow_dispatch:
 
 concurrency:
-  # Pull requests: one run per branch, newest wins. Pushes: one run per
-  # commit, nothing cancelled — a commit with no verdict is a hole nobody
-  # comes back to fill.
+  # Pull requests: one run per branch, newest wins — a run against a head that has been
+  # superseded is answering a question nobody is asking any more.
+  #
+  # Pushes: one run per commit, and nothing cancels anything. A commit with no verdict is
+  # a hole nobody comes back to fill: the next commit contains it, so the code does get
+  # tested eventually, but once that run is red there is no longer any way to say which of
+  # the two commits did it.
+  #
+  # Keying the group on the SHA, rather than only turning cancel-in-progress off, is what
+  # makes that hold for more than two pushes: a group keeps at most one run *pending*, so
+  # a third push discards the second before it ever starts.
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -22,7 +31,7 @@ jobs:
     steps:
 
       - name: Checkout (no submodules needed)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Re-derives the hand-cross-validated anchors and fails when the
       # committed JSON differs from what the generator emits.
@@ -30,33 +39,87 @@ jobs:
         run: python3 tools/generate-test-vectors.py --check
 
   csharp:
-    name: "C# harness: Hermod (${{ matrix.os }})"
+    name: "C# harness: Hermod (${{ matrix.leg }})"
     runs-on: ${{ matrix.os }}
-    # Both platforms Hermod is developed on; fail-fast off so that
-    # "red on exactly one platform" — the most valuable signal a matrix
-    # produces — is never cancelled by the other leg.
+    container: ${{ matrix.container }}
+    # Hermod's own two legs (see Hermod's ci.yml for the long form):
+    #
+    #  * Debian 13, because that is what Hermod runs on in production. GitHub offers no
+    #    Debian runner image, so this leg runs on an Ubuntu runner inside a bare debian:13
+    #    container — deliberately NOT the official .NET SDK image, which is still
+    #    Debian-12-based.
+    #  * Windows, because that is where Hermod is developed; crypto goes through
+    #    Schannel/CryptoAPI instead of OpenSSL.
+    #
+    # fail-fast is off on purpose: "red on exactly one platform" is the most valuable
+    # signal this matrix produces, so one leg must not cancel the other.
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        include:
+          - os: windows-latest
+            leg: windows-latest
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
     steps:
 
+      # FIRST, before the checkout: the bare debian:13 image has no git, and
+      # actions/checkout silently falls back to downloading a tarball through the REST API
+      # when it cannot find one. That yields a working tree with no .git directory, and the
+      # submodule checkout then fails on a repository that is not a repository.
+      #
+      # The rest are the .NET runtime prerequisites that setup-dotnet needs before it can
+      # install the SDK: curl for the dotnet-install script itself, ICU and tzdata for
+      # globalization, OpenSSL for crypto, ca-certificates for NuGet and git over HTTPS.
+      # Package names verified on Debian 13 (trixie).
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          # Everything in this container runs as root while the workspace comes from the
+          # host, which git reads as dubious ownership and refuses to touch. checkout sets
+          # this for the repository itself; the submodule working trees below are not
+          # covered by that.
+          git config --global --add safe.directory '*'
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj --configuration Release
 
       - name: Test
-        run: dotnet test Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj -c Release
+        timeout-minutes: 15
+        run: dotnet test Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}.trx" --results-directory artifacts
+
+      # TRX keeps per-test outcome, duration, error message and the Assert.Ignore reason —
+      # and the skips in this suite are load-bearing (documented deviations, capability
+      # gaps), while a skip reason never reaches the console at normal verbosity.
+      # !cancelled() rather than success(): a red run is when these files matter most.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: artifacts/*.trx
 
   typescript:
     name: "TS harness: TOTP.ts (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
+    # Ubuntu because that is where TOTP.ts runs in production, Windows because that is
+    # where it is developed (TOTP.ts's own CI reasoning). The 2×3 Node release-line matrix
+    # lives in the TOTP.ts repository — the conformance question here is "does the
+    # implementation match the vectors", asked once per OS on the current Node.
     strategy:
       fail-fast: false
       matrix:
@@ -64,17 +127,19 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: Tests/TOTPConformance_Tests.TS/package-lock.json
 
       - name: Install
-        run: npm --prefix Tests/TOTPConformance_Tests.TS install
+        run: npm --prefix Tests/TOTPConformance_Tests.TS ci
 
       - name: Test
         run: npm --prefix Tests/TOTPConformance_Tests.TS test

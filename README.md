@@ -1,6 +1,7 @@
 # TOTP Conformance Tests
 
 [![CI](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/ci.yml)
+[![Nightly](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/nightly.yml)
 
 Conformance test suite for the **Open Charging Cloud TOTP token format** — the
 machine-to-machine Time-based One-Time Password format shared by two
@@ -78,6 +79,11 @@ python tools/generate-test-vectors.py --check
    TOTP.ts does not implement that extension).
 3. CI regenerates the files in `--check` mode, so hand-edits and generator
    drift are caught.
+4. The CI gate runs against the pinned submodules on Windows and Debian 13
+   (the platform Hermod runs on in production); the nightly workflow advances
+   all three submodules to their upstream HEADs and runs both harnesses
+   again — so a format-breaking change in Hermod, Styx or TOTP.ts master is
+   noticed even on a day nobody pushes here.
 
 Vectors marked `requires: ["tlsChannelBinding"]` are skipped by harnesses
 without that capability; invalid-input vectors marked
