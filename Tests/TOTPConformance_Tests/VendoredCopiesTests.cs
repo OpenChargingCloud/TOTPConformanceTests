@@ -45,7 +45,8 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
         private static readonly String[] fileNames = [
             "totp-test-vectors.json",
-            "totp-invalid-inputs.json"
+            "totp-invalid-inputs.json",
+            "totp-http-auth-vectors.json"
         ];
 
         private static readonly (String Name, String RelativePath)[] vendors = [

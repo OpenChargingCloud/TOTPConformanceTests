@@ -46,9 +46,10 @@ npm --prefix Tests/TOTPConformance_Tests.TS test
 python tools/generate-test-vectors.py --check
 ```
 
-Expected: C# 70 passed / 1 skipped (length-fractional, not representable in
-the UInt32 API), TS 58 passed / 3 skipped (TLS channel binding vectors —
-Hermod-only capability). Skips are load-bearing, not noise.
+Expected: C# 92 passed / 1 skipped (length-fractional, not representable in
+the UInt32 API), TS 58 passed / 4 skipped (TLS channel binding vectors and
+the HTTP-auth vector file — Hermod-only capabilities). Skips are
+load-bearing, not noise.
 
 ## Ground rules
 

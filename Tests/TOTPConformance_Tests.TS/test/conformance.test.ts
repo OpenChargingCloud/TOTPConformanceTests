@@ -24,6 +24,7 @@ import {
     KNOWN_CAPABILITIES,
     IMPLEMENTATION_NAME,
     generationVectors,
+    httpAuthFileRequires,
     invalidInputVectors,
     type VectorInput
 } from "./vectors";
@@ -49,13 +50,20 @@ describe("Vector files", () => {
     });
 
     it("require only capabilities this harness knows about", () => {
-        // A new capability in the vector file must fail here, so that it
+        // A new capability in the vector files must fail here, so that it
         // cannot be skipped silently.
-        const unknown = generationVectors
-            .flatMap(vector => vector.requires ?? [])
+        const unknown = [ ...generationVectors.flatMap(vector => vector.requires ?? []),
+                          ...httpAuthFileRequires ]
             .filter(capability => !KNOWN_CAPABILITIES.has(capability));
         expect(unknown).toEqual([]);
     });
+
+    // The HTTP authentication vectors are gated as a whole file. TOTP.ts has
+    // no HTTP binding, so the skip is declared here - visible, never silent.
+    const missingHttp = httpAuthFileRequires.filter(capability => !CAPABILITIES.has(capability));
+
+    if (missingHttp.length > 0)
+        it.skip(`totp-http-auth-vectors.json (requires: ${missingHttp.join(", ")})`, () => {});
 
 });
 

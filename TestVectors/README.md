@@ -36,6 +36,22 @@ Each vector: `input` → expected `previous`/`current`/`next` token and
    * `tlsChannelBinding` — TLS v1.3 channel binding (spec section 6),
      currently Hermod only.
 
+## totp-http-auth-vectors.json — the "Authorization: TOTP" scheme
+
+Vectors for the HTTP authentication binding
+([spec/totp-http-authentication.md](../spec/totp-http-authentication.md)):
+`TOTP <type> base64(identity):base64(totp)`.
+
+ * `vectors` — credential building (identity, token, type digit → the exact
+   header value); harnesses also parse the header back (round-trip).
+ * `parseVectors` — parse-only leniency cases (scheme case-insensitivity).
+ * `invalidHeaders` — header values parsers MUST reject.
+
+The **whole file** carries a top-level `requires` list (currently
+`httpAuthentication` — Hermod only). A harness whose implementation lacks a
+listed capability skips the file **declaratively** — one visible skip entry,
+never silence — and still fails on capability names it does not know.
+
 ## totp-invalid-inputs.json — inputs that MUST be rejected
 
 Each vector: `input` → `expectedError`, the shared error message of spec

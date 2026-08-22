@@ -32,6 +32,7 @@ Usage:
 The JSON files are generated - do not edit them by hand.
 """
 
+import base64
 import hmac
 import json
 import sys
@@ -48,8 +49,9 @@ VENDOR_DIRS  = [
     REPO_ROOT / "libs" / "TOTP.TS" / "test"        / "vectors",
 ]
 
-SPEC_NAME    = "Open Charging Cloud TOTP Token Format 1.0"
-GENERATOR    = "tools/generate-test-vectors.py"
+SPEC_NAME       = "Open Charging Cloud TOTP Token Format 1.0"
+SPEC_NAME_HTTP  = "Open Charging Cloud TOTP HTTP Authentication 1.0 (draft)"
+GENERATOR       = "tools/generate-test-vectors.py"
 
 MASK64       = 0xFFFF_FFFF_FFFF_FFFF
 
@@ -574,6 +576,145 @@ def invalid_vectors() -> list[dict]:
 
 
 # --------------------------------------------------------------------------
+# The HTTP authentication vectors (spec/totp-http-authentication.md,
+# "Authorization: TOTP" scheme): TOTP <type> base64(identity):base64(totp).
+#
+# The whole file requires the "httpAuthentication" capability - currently
+# Hermod only; harnesses without it skip the file DECLARATIVELY (a visible
+# skip, never silence). The Basic Auth binding of the specification gets no
+# vectors here: its encoding is RFC 7617's, not ours.
+# --------------------------------------------------------------------------
+
+HTTP_USER       = "chargingstation-0001"
+HTTP_RAW_TOTP   = "CN63y502maVh"    # vector "defaults-mid-slot"
+HTTP_BOUND_TOTP = "gAzxPfYtmRgd"    # vector "tls-binding-sha256"
+
+
+def b64(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
+
+
+def http_header(username: str, totp: str, type_: int) -> str:
+    return f"TOTP {type_} {b64(username)}:{b64(totp)}"
+
+
+def http_auth_vector(id_: str, description: str,
+                     username: str, totp: str, type_: int) -> dict:
+    return {
+        "id":           id_,
+        "description":  description,
+        "input":        {"username": username, "totp": totp, "type": type_},
+        "expected":     {"header": http_header(username, totp, type_)}
+    }
+
+
+def http_auth_vectors() -> list[dict]:
+
+    return [
+
+        http_auth_vector("raw-defaults",
+                         "A raw token (type 0) for a plain ASCII identity.",
+                         HTTP_USER, HTTP_RAW_TOTP, 0),
+
+        http_auth_vector("tls-channel-bound",
+                         "A TLS-channel-bound token (type 1).",
+                         HTTP_USER, HTTP_BOUND_TOTP, 1),
+
+        http_auth_vector("username-with-colon",
+                         "Identity and token are Base64-encoded separately, so a colon in the "
+                         "identity - HTTP Basic Auth's classic ambiguity - is harmless.",
+                         "EVSE:DE*GEF*E1234*1", HTTP_RAW_TOTP, 0),
+
+        http_auth_vector("username-utf8",
+                         "A non-ASCII identity is UTF-8 encoded before Base64.",
+                         "Ladesäule-Süd-01", "SLuwWQOYh3g0", 0),
+
+        http_auth_vector("short-token",
+                         "A six character token (the OCPP minimum length).",
+                         HTTP_USER, "Ik0dNs", 0),
+
+    ]
+
+
+def http_parse_vectors() -> list[dict]:
+
+    return [
+        {
+            "id":           "scheme-lowercase",
+            "description":  "The scheme name is matched case-insensitively.",
+            "header":       f"totp 0 {b64(HTTP_USER)}:{b64(HTTP_RAW_TOTP)}",
+            "expected":     {"username": HTTP_USER, "totp": HTTP_RAW_TOTP, "type": 0}
+        },
+        {
+            "id":           "scheme-mixed-case",
+            "description":  "The scheme name is matched case-insensitively.",
+            "header":       f"tOtP 1 {b64(HTTP_USER)}:{b64(HTTP_BOUND_TOTP)}",
+            "expected":     {"username": HTTP_USER, "totp": HTTP_BOUND_TOTP, "type": 1}
+        },
+    ]
+
+
+def http_invalid_headers() -> list[dict]:
+
+    cred = f"{b64(HTTP_USER)}:{b64(HTTP_RAW_TOTP)}"
+
+    def bad(id_: str, description: str, header: str) -> dict:
+        return {"id": id_, "description": description, "header": header}
+
+    return [
+
+        bad("missing-type-digit",
+            "The type digit is mandatory.",
+            f"TOTP {cred}"),
+
+        bad("colon-separated-type",
+            "The colon-separated type of an earlier draft is not the format.",
+            f"TOTP 1:{cred}"),
+
+        bad("unknown-type-digit",
+            "Only the type digits 0 and 1 exist.",
+            f"TOTP 2 {cred}"),
+
+        bad("type-without-credentials",
+            "A type digit alone is not a credential.",
+            "TOTP 1"),
+
+        bad("missing-colon",
+            "The credential must contain base64(identity):base64(totp).",
+            f"TOTP 0 {b64(HTTP_USER)}"),
+
+        bad("three-segments",
+            "Exactly one colon separates identity and token.",
+            "TOTP 0 YQ==:YQ==:YQ=="),
+
+        bad("extra-parameter",
+            "Nothing follows the credential.",
+            f"TOTP 0 {cred} extra"),
+
+        bad("username-not-base64",
+            "The identity segment must be valid Base64.",
+            f"TOTP 0 not-base64!:{b64(HTTP_RAW_TOTP)}"),
+
+        bad("totp-not-base64",
+            "The token segment must be valid Base64.",
+            f"TOTP 0 {b64(HTTP_USER)}:not-base64!"),
+
+        bad("wrong-scheme",
+            "A different authentication scheme is not ours to parse.",
+            f"Basic 0 {cred}"),
+
+        bad("empty",
+            "An empty header value is rejected.",
+            ""),
+
+        bad("scheme-only",
+            "The scheme name alone is not a credential.",
+            "TOTP"),
+
+    ]
+
+
+# --------------------------------------------------------------------------
 # File emission.
 # --------------------------------------------------------------------------
 
@@ -607,6 +748,21 @@ def build_files() -> dict[Path, str]:
                            "'knownDeviations'/'notApplicable' semantics in "
                            "TestVectors/README.md.",
             "vectors": invalid_vectors()
+        }),
+        VECTORS_DIR / "totp-http-auth-vectors.json": render({
+            "$comment":       header["$comment"],
+            "specification":  SPEC_NAME_HTTP,
+            "description":    "The 'Authorization: TOTP' scheme: TOTP <type> "
+                              "base64(identity):base64(totp). 'vectors' round-trip "
+                              "(build the header from the input AND parse it back), "
+                              "'parseVectors' are parse-only leniency cases, "
+                              "'invalidHeaders' MUST be rejected by parsers. The whole "
+                              "file requires the listed capabilities; harnesses without "
+                              "them skip it declaratively.",
+            "requires":       ["httpAuthentication"],
+            "vectors":        http_auth_vectors(),
+            "parseVectors":   http_parse_vectors(),
+            "invalidHeaders": http_invalid_headers()
         }),
     }
 

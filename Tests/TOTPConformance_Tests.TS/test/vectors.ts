@@ -35,7 +35,8 @@ export const CAPABILITIES: ReadonlySet<string> = new Set([]);
  * this harness - fail, never skip silently.
  */
 export const KNOWN_CAPABILITIES: ReadonlySet<string> = new Set([
-    "tlsChannelBinding"
+    "tlsChannelBinding",
+    "httpAuthentication"
 ]);
 
 
@@ -74,6 +75,7 @@ export interface InvalidInputVector {
 interface VectorFile<T> {
     specification:  string;
     description:    string;
+    requires?:      string[];
     vectors:        T[];
 }
 
@@ -86,3 +88,10 @@ function load<T>(fileName: string): VectorFile<T> {
 
 export const generationVectors    = load<GenerationVector>  ("totp-test-vectors.json").vectors;
 export const invalidInputVectors  = load<InvalidInputVector>("totp-invalid-inputs.json").vectors;
+
+/**
+ * The HTTP authentication vectors (spec/totp-http-authentication.md) are
+ * capability-gated as a whole file: TOTP.ts implements no HTTP binding, so
+ * this harness only checks the gate and skips the file DECLARATIVELY.
+ */
+export const httpAuthFileRequires = load<unknown>("totp-http-auth-vectors.json").requires ?? [];

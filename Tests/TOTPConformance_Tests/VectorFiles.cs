@@ -41,13 +41,16 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         /// The optional capabilities Hermod provides ("requires" lists of vectors).
         /// </summary>
         public static readonly IReadOnlySet<String> Capabilities = new HashSet<String> {
-            "tlsChannelBinding"
+            "tlsChannelBinding",
+            "httpAuthentication"
         };
 
 
         public static GenerationVectorFile  Generation     { get; } = Load<GenerationVectorFile>("totp-test-vectors.json");
 
         public static InvalidInputFile      InvalidInputs  { get; } = Load<InvalidInputFile>   ("totp-invalid-inputs.json");
+
+        public static HttpAuthVectorFile    HttpAuth       { get; } = Load<HttpAuthVectorFile> ("totp-http-auth-vectors.json");
 
 
         private static T Load<T>(String FileName)
@@ -110,6 +113,53 @@ namespace cloud.charging.open.TOTP.Conformance.tests
     public sealed class InvalidInputFile
     {
         public List<InvalidInputVector>  Vectors  { get; set; } = [];
+    }
+
+
+    public sealed class HttpAuthVectorFile
+    {
+        public List<String>                 Requires        { get; set; } = [];
+        public List<HttpAuthVector>         Vectors         { get; set; } = [];
+        public List<HttpAuthParseVector>    ParseVectors    { get; set; } = [];
+        public List<InvalidHeaderVector>    InvalidHeaders  { get; set; } = [];
+    }
+
+    public sealed class HttpAuthVector
+    {
+        public String            Id           { get; set; } = "";
+        public String            Description  { get; set; } = "";
+        public HttpAuthTriple    Input        { get; set; } = new();
+        public HttpAuthExpected  Expected     { get; set; } = new();
+        public override String ToString() => Id;
+    }
+
+    public sealed class HttpAuthParseVector
+    {
+        public String          Id           { get; set; } = "";
+        public String          Description  { get; set; } = "";
+        public String          Header       { get; set; } = "";
+        public HttpAuthTriple  Expected     { get; set; } = new();
+        public override String ToString() => Id;
+    }
+
+    public sealed class HttpAuthTriple
+    {
+        public String  Username  { get; set; } = "";
+        public String  Totp      { get; set; } = "";
+        public Int32   Type      { get; set; }
+    }
+
+    public sealed class HttpAuthExpected
+    {
+        public String  Header  { get; set; } = "";
+    }
+
+    public sealed class InvalidHeaderVector
+    {
+        public String  Id           { get; set; } = "";
+        public String  Description  { get; set; } = "";
+        public String  Header       { get; set; } = "";
+        public override String ToString() => Id;
     }
 
     public sealed class InvalidInputVector
