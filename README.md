@@ -84,6 +84,11 @@ python tools/generate-test-vectors.py --check
    all three submodules to their upstream HEADs and runs both harnesses
    again — so a format-breaking change in Hermod, Styx or TOTP.ts master is
    noticed even on a day nobody pushes here.
+5. Both implementation repositories run their **own** test suites against
+   vendored copies of the vector files (their hand-duplicated expected values
+   are gone); the generator mirrors the canonical files into the submodules,
+   and `VendoredCopiesTests` fails when a copy drifts — see
+   [`TestVectors/README.md`](TestVectors/README.md).
 
 Vectors marked `requires: ["tlsChannelBinding"]` are skipped by harnesses
 without that capability; invalid-input vectors marked

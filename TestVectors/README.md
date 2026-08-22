@@ -53,7 +53,16 @@ Implementation names used in these two fields: `hermod`, `totp.ts`.
 
 ## Consuming the vectors from the implementation repositories
 
-Both implementation repositories can run against these files directly —
-add this repository as a git submodule, or vendor the two JSON files and
-compare them against this repository in CI. Their ids are stable; new vectors
-only ever get new ids.
+Both implementation repositories carry **vendored copies** of the two JSON
+files and run their own test suites against them:
+
+ * Hermod: `HermodTests/TOTP/TestVectors/`, run by `TOTPVectorTests.cs`
+ * TOTP.ts: `test/vectors/`, run by `test/vectors.test.ts`
+
+A submodule would be cyclic — this repository already contains both
+implementations as submodules, and a `--recursive` checkout would never
+terminate. The copies cannot drift: `tools/generate-test-vectors.py` mirrors
+the canonical files into the checked-out submodules on every run, and
+`VendoredCopiesTests` in the C# harness compares the copies against the
+canonical files — in CI against the pinned submodules, in the nightly against
+the upstream HEADs. Vector ids are stable; new vectors only ever get new ids.

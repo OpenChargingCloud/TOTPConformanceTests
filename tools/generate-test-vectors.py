@@ -15,9 +15,19 @@ before this repository existed - and refuses to write when even one of them
 does not match. The emitted JSON is therefore backed by three independent
 implementations agreeing on every anchored value.
 
+Both implementation repositories carry VENDORED COPIES of the two JSON files,
+so that their own test suites run against the very same vectors without a
+submodule (which would be cyclic - this repository already contains both
+implementations as submodules). This script mirrors the canonical files into
+the checked-out submodules, and VendoredCopiesTests in the C# harness fails
+when a pinned (CI) or upstream (nightly) copy has drifted:
+
+    libs/Hermod/HermodTests/TOTP/TestVectors/
+    libs/TOTP.TS/test/vectors/
+
 Usage:
-    python tools/generate-test-vectors.py            # (re)write TestVectors/*.json
-    python tools/generate-test-vectors.py --check    # verify the files are current
+    python tools/generate-test-vectors.py            # (re)write canonical + vendored files
+    python tools/generate-test-vectors.py --check    # verify all of them are current
 
 The JSON files are generated - do not edit them by hand.
 """
@@ -29,6 +39,14 @@ from pathlib import Path
 
 REPO_ROOT    = Path(__file__).resolve().parent.parent
 VECTORS_DIR  = REPO_ROOT / "TestVectors"
+
+# Vendored copies inside the implementation submodules. A copy is only
+# written/checked when its submodule is checked out (the CI vector job checks
+# out no submodules; there the C# harness's VendoredCopiesTests is the guard).
+VENDOR_DIRS  = [
+    REPO_ROOT / "libs" / "Hermod"  / "HermodTests" / "TOTP" / "TestVectors",
+    REPO_ROOT / "libs" / "TOTP.TS" / "test"        / "vectors",
+]
 
 SPEC_NAME    = "Open Charging Cloud TOTP Token Format 1.0 (draft)"
 GENERATOR    = "tools/generate-test-vectors.py"
@@ -571,7 +589,7 @@ def build_files() -> dict[Path, str]:
         "specification":  SPEC_NAME,
     }
 
-    return {
+    canonical = {
         VECTORS_DIR / "totp-test-vectors.json": render({
             **header,
             "description": "Canonical TOTP generation vectors. Absent optional input "
@@ -592,6 +610,14 @@ def build_files() -> dict[Path, str]:
         }),
     }
 
+    files = dict(canonical)
+    for vendor_dir in VENDOR_DIRS:
+        if vendor_dir.parent.is_dir():
+            for path, content in canonical.items():
+                files[vendor_dir / path.name] = content
+
+    return files
+
 
 def main() -> int:
 
@@ -602,7 +628,10 @@ def main() -> int:
 
     stale = []
     for path, content in files.items():
-        current = path.read_text(encoding="utf-8") if path.exists() else None
+        # The vendored copies live in repositories without an eol=lf
+        # .gitattributes rule, so autocrlf checkouts materialize them with
+        # CRLF - that is not drift. (The canonical files are LF-pinned.)
+        current = path.read_text(encoding="utf-8").replace("\r\n", "\n") if path.exists() else None
         if current != content:
             stale.append(path)
             if not check:

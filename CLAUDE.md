@@ -14,7 +14,12 @@ implementations to one set of canonical vectors: Hermod's `TOTPGenerator`
   `tools/generate-test-vectors.py` — edit the generator, rerun it, never the
   JSON. The generator refuses to write when the hand-cross-validated anchors
   mismatch. `--check` is the CI drift guard and compares byte-for-byte
-  (hence `.gitattributes` forces LF on these files).
+  (hence `.gitattributes` forces LF on these files). The generator also
+  mirrors the files into VENDORED COPIES inside the submodules
+  (`libs/Hermod/HermodTests/TOTP/TestVectors/`, `libs/TOTP.TS/test/vectors/`)
+  — the implementations' own suites run against those, and
+  `VendoredCopiesTests` fails when a copy drifts. After regenerating, commit
+  the implementation repos first, then bump the pins here.
 - **What implementations get wrong:** `docs/spec-deviations.md`. Each
   deviation is marked on its vector (`knownDeviations`) AND pinned by a
   characterization test in `Tests/TOTPConformance_Tests/KnownDeviationTests.cs`.
@@ -37,7 +42,7 @@ npm --prefix Tests/TOTPConformance_Tests.TS test
 python tools/generate-test-vectors.py --check
 ```
 
-Expected: C# 66 passed / 1 skipped (length-fractional, not representable in
+Expected: C# 70 passed / 1 skipped (length-fractional, not representable in
 the UInt32 API), TS 58 passed / 3 skipped (TLS channel binding vectors —
 Hermod-only capability). Skips are load-bearing, not noise.
 
