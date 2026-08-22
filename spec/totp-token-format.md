@@ -1,6 +1,6 @@
 # Open Charging Cloud TOTP Token Format
 
-**Version 1.0 — Draft**, 2026-08-22
+**Version 1.0**, 2026-08-22
 Apache License 2.0 · [OpenChargingCloud/TOTPConformanceTests](https://github.com/OpenChargingCloud/TOTPConformanceTests)
 
 This document specifies the Time-based One-Time Password (TOTP) token format

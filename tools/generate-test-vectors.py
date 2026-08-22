@@ -48,7 +48,7 @@ VENDOR_DIRS  = [
     REPO_ROOT / "libs" / "TOTP.TS" / "test"        / "vectors",
 ]
 
-SPEC_NAME    = "Open Charging Cloud TOTP Token Format 1.0 (draft)"
+SPEC_NAME    = "Open Charging Cloud TOTP Token Format 1.0"
 GENERATOR    = "tools/generate-test-vectors.py"
 
 MASK64       = 0xFFFF_FFFF_FFFF_FFFF
