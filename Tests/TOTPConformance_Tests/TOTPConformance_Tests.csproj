@@ -13,9 +13,10 @@
     <ProjectReference Include="..\..\libs\Hermod\Hermod\Hermod.csproj" />
   </ItemGroup>
 
-  <!-- The canonical vector files, shared with the TypeScript harness. -->
+  <!-- The canonical vector files: the specification's normative annex
+       (libs/specification submodule), shared with the TypeScript harness. -->
   <ItemGroup>
-    <None Include="..\..\TestVectors\*.json"
+    <None Include="..\..\libs\specification\TimeBasedOneTimePasswords\test-vectors\*.json"
           Link="TestVectors\%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

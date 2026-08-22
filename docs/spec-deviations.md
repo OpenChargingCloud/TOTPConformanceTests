@@ -1,17 +1,20 @@
 # Known deviations from the specification
 
-The [token format specification](../spec/totp-token-format.md) requires input
-validation (section 5) beyond what the implementations historically
-performed. Deviations are
+The [token format specification](../libs/specification/TimeBasedOneTimePasswords/totp-token-format.md)
+requires input validation (section 5) beyond what the implementations
+historically performed. Deviations are
 
- * marked on their vector in `TestVectors/totp-invalid-inputs.json`
+ * marked on their vector in `totp-invalid-inputs.json` of the
+   specification's annex
    (`"knownDeviations": ["<implementation>"]`), so the conformance harness
    skips them instead of failing, and
  * **pinned** by a characterization test in
    `Tests/TOTPConformance_Tests/KnownDeviationTests.cs`, so a fix cannot go
    unnoticed: when the implementation changes, the characterization test
-   fails — then remove the marker in `tools/generate-test-vectors.py`,
-   regenerate the vectors, and delete the characterization test.
+   fails — then remove the marker in the annex generator
+   (`libs/specification/TimeBasedOneTimePasswords/tools/generate-test-vectors.py`),
+   regenerate (commit Whitepapers first, then the implementation repos, then
+   the pins here), and delete the characterization test.
 
 TOTP.ts has no deviations: it implements every validation rule of
 specification section 5.

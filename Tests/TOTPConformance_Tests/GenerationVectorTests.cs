@@ -28,9 +28,10 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
     /// <summary>
     /// Runs the Hermod TOTPGenerator against every canonical generation vector
-    /// in TestVectors/totp-test-vectors.json. The TypeScript harness runs
-    /// TOTP.ts against the very same file, so a divergence of the two
-    /// implementations fails here instead of in the field.
+    /// in totp-test-vectors.json of the specification's annex
+    /// (libs/specification/TimeBasedOneTimePasswords/test-vectors/). The
+    /// TypeScript harness runs TOTP.ts against the very same file, so a
+    /// divergence of the two implementations fails here instead of in the field.
     /// </summary>
     [TestFixture]
     public class GenerationVectorTests

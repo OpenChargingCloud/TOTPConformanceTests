@@ -26,16 +26,21 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
     /// <summary>
     /// Both implementation repositories carry VENDORED COPIES of the canonical
-    /// vector files, so that their own test suites run against the very same
-    /// vectors without a submodule (which would be cyclic - this repository
-    /// already contains both implementations as submodules).
+    /// vector files - the specification's normative annex in the
+    /// libs/specification submodule - so that their own test suites run
+    /// against the very same vectors while staying self-contained.
     ///
-    /// These tests fail when a vendored copy drifts from the canonical file.
-    /// In CI that guards the pinned submodules; in the nightly run - which
-    /// advances the submodules to their upstream HEADs - it guards the
-    /// upstream branches. Fix drift by regenerating:
-    /// python tools/generate-test-vectors.py mirrors the canonical files into
-    /// the checked-out submodules; then commit the implementation repository.
+    /// These tests fail when a vendored copy drifts from the annex. In CI
+    /// that guards the pinned submodules; in the nightly run - which advances
+    /// the submodules (including the specification) to their upstream HEADs -
+    /// it guards the upstream branches. Fix drift by regenerating:
+    ///
+    /// python libs/specification/TimeBasedOneTimePasswords/tools/generate-test-vectors.py
+    ///     --mirror libs/Hermod/HermodTests/TOTP/TestVectors
+    ///     --mirror libs/TOTP.TS/test/vectors
+    ///
+    /// then commit the repositories in order: specification, implementations,
+    /// the pins here.
     /// </summary>
     [TestFixture]
     public class VendoredCopiesTests
@@ -93,23 +98,27 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         {
 
             var root       = RepositoryRoot().FullName;
-            var canonical  = Path.Combine(root, "TestVectors", FileName);
-            var vendored   = Path.Combine(root, VendorPath,    FileName);
+            var canonical  = Path.Combine(root,
+                                          "libs", "specification",
+                                          "TimeBasedOneTimePasswords", "test-vectors",
+                                          FileName);
+            var vendored   = Path.Combine(root, VendorPath, FileName);
 
             Assert.That(File.Exists(vendored),
                         Is.True,
                         $"Missing vendored copy '{vendored}'!");
 
             // Compared after newline normalization: the byte-level guarantee for the
-            // canonical files lives in this repository's .gitattributes, but the
+            // annex lives in the specification repository's .gitattributes, but the
             // implementation repositories may check the copies out with CRLF.
             static String Normalized(String path)
                 => File.ReadAllText(path).Replace("\r\n", "\n");
 
             Assert.That(Normalized(vendored),
                         Is.EqualTo(Normalized(canonical)),
-                        $"'{vendored}' has drifted from the canonical file - " +
-                         "regenerate with: python tools/generate-test-vectors.py");
+                        $"'{vendored}' has drifted from the specification's annex - " +
+                         "regenerate with: python libs/specification/TimeBasedOneTimePasswords/" +
+                         "tools/generate-test-vectors.py --mirror <vendored dir>");
 
         }
 

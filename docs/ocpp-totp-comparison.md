@@ -6,7 +6,8 @@ Part 2 - Specification, © Open Charge Alliance, 2025-12-03, pp. 145–153)
 normatively defines "**TOTP algorithm, version 1**", and the C# sample code
 printed there is the direct ancestor of Hermod's `TOTPGenerator`. This
 document compares the OCPP text against [our
-specification](../spec/totp-token-format.md) and the two implementations, and
+specification](../libs/specification/TimeBasedOneTimePasswords/totp-token-format.md)
+and the two implementations, and
 collects the points where the OCPP text should be modernized.
 
 Clause references: C25 requirements `C25.FR.xx`, the unnumbered sections "URL
@@ -35,8 +36,9 @@ element by element against the OCPP pseudocode and C# sample:
 | Acceptance window | current, then previous, then next interval ("Validation of TOTP") | the previous/current/next triple (§4.4, §7) — same ±1-slot window |
 
 The `ocpp-v1-length-8` and `ocpp-v1-min-profile` vectors in
-`TestVectors/totp-test-vectors.json` pin OCPP-representable parameter sets, so
-both implementations remain provably compatible with OCPP C25 deployments.
+`totp-test-vectors.json` of the specification's annex pin OCPP-representable
+parameter sets, so both implementations remain provably compatible with OCPP
+C25 deployments.
 
 **Conclusion: OCPP TOTP v1 is the profile of this specification with
 `hashAlgorithm = sha256` and the default Base62 alphabet.** Our specification
@@ -110,7 +112,8 @@ Ordered roughly by impact; 1–3 are the substantive ones.
 3. **Version the algorithm forward instead of freezing on "v1".**
    `WebPaymentsCtrlr.TOTPVersion` (valuesList: `"v1"`) is exactly the right
    extension point. A future `"v2"` should reference the [token format
-   specification](../spec/totp-token-format.md) as the algorithm family:
+   specification](../libs/specification/TimeBasedOneTimePasswords/totp-token-format.md)
+   as the algorithm family:
    configurable hash (sha256/sha384/sha512), configurable alphabet (with the
    no-bias sizes 16/32/64 RECOMMENDED), length 4–255. That turns the OCPP text
    from a re-specification into a profile of a maintained spec with canonical
@@ -159,9 +162,10 @@ Ordered roughly by impact; 1–3 are the substantive ones.
 
 9. **Publish test vectors.** The OCPP text contains none — the single example
    token `aHicux89` in Figure 46 is illustrative, not derivable. The
-   canonical vectors in this repository (`TestVectors/`) cover the OCPP v1
-   profile explicitly and are Apache-2.0 — they could be referenced or
-   included in the next edition.
+   specification's canonical vector annex
+   ([Whitepapers → TimeBasedOneTimePasswords/test-vectors/](https://github.com/OpenChargingTechnology/Whitepapers/tree/master/TimeBasedOneTimePasswords/test-vectors),
+   CC-BY-SA 4.0) covers the OCPP v1 profile explicitly — it could be
+   referenced or included in the next edition.
 
 10. **Modernize the C# sample.** `DateTime.UtcNow - new DateTime(1970, 1, 1)`
     predates `DateTimeOffset.UtcNow.ToUnixTimeSeconds()`; the sample performs

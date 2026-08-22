@@ -70,9 +70,9 @@ describe("Vector files", () => {
 
 describe("Generation vectors", () => {
 
-    // TOTP.ts runs TestVectors/totp-test-vectors.json - the same file the C#
-    // harness runs Hermod against, so a divergence of the two implementations
-    // fails here instead of in the field.
+    // TOTP.ts runs totp-test-vectors.json of the specification's annex - the
+    // same file the C# harness runs Hermod against, so a divergence of the
+    // two implementations fails here instead of in the field.
     for (const vector of generationVectors) {
 
         const missing = (vector.requires ?? []).filter(capability => !CAPABILITIES.has(capability));

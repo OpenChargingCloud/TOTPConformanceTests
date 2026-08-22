@@ -28,9 +28,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
     /// <summary>
     /// Runs the Hermod TOTPGenerator against every invalid input vector in
-    /// TestVectors/totp-invalid-inputs.json: each input MUST be rejected with
-    /// the shared error message (the C# side appends the parameter name, so
-    /// only the start of the message is asserted).
+    /// totp-invalid-inputs.json of the specification's annex: each input MUST
+    /// be rejected with the shared error message (the C# side appends the
+    /// parameter name, so only the start of the message is asserted).
     ///
     /// Vectors marked "knownDeviations": ["hermod"] are skipped here and
     /// characterized in KnownDeviationTests instead - see docs/spec-deviations.md.

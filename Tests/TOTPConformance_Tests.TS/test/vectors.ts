@@ -82,7 +82,7 @@ interface VectorFile<T> {
 
 function load<T>(fileName: string): VectorFile<T> {
     return JSON.parse(
-        readFileSync(new URL(`../../../TestVectors/${fileName}`, import.meta.url), "utf-8")
+        readFileSync(new URL(`../../../libs/specification/TimeBasedOneTimePasswords/test-vectors/${fileName}`, import.meta.url), "utf-8")
     ) as VectorFile<T>;
 }
 
@@ -90,8 +90,9 @@ export const generationVectors    = load<GenerationVector>  ("totp-test-vectors.
 export const invalidInputVectors  = load<InvalidInputVector>("totp-invalid-inputs.json").vectors;
 
 /**
- * The HTTP authentication vectors (spec/totp-http-authentication.md) are
- * capability-gated as a whole file: TOTP.ts implements no HTTP binding, so
- * this harness only checks the gate and skips the file DECLARATIVELY.
+ * The HTTP authentication vectors (totp-http-authentication.md of the
+ * specification) are capability-gated as a whole file: TOTP.ts implements no
+ * HTTP binding, so this harness only checks the gate and skips the file
+ * DECLARATIVELY.
  */
 export const httpAuthFileRequires = load<unknown>("totp-http-auth-vectors.json").requires ?? [];

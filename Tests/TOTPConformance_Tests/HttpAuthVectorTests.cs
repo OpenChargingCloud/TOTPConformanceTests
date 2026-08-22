@@ -29,8 +29,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
     /// <summary>
     /// Runs Hermod's HTTPTOTPAuthentication against the canonical HTTP
-    /// authentication vectors in TestVectors/totp-http-auth-vectors.json -
-    /// the "Authorization: TOTP" scheme of spec/totp-http-authentication.md
+    /// authentication vectors in totp-http-auth-vectors.json of the
+    /// specification's annex - the "Authorization: TOTP" scheme of
+    /// totp-http-authentication.md
     /// as RFC 9110 auth-params: TOTP login="&lt;b64&gt;", totp="&lt;b64&gt;"
     /// [, tlscb=true|false], with tlscb defaulting to TRUE. Build vectors
     /// round-trip in both directions, parse vectors pin leniency (scheme and

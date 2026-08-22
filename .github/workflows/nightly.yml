@@ -5,12 +5,14 @@ name: Nightly
 # repetition of the gate could only ever reproduce the previous run: this suite is fully
 # deterministic (TOTP.ts's nightly makes the same argument).
 #
-# What CAN move without any push to this repository are the implementations themselves.
-# This workflow therefore advances all three submodules to their upstream HEADs and runs
-# both harnesses against them. A red here without a corresponding red in CI means Hermod,
-# Styx or TOTP.ts master broke the frozen token format — the one thing this repository
-# exists to notice, preferably before a release does. Like Hermod building against Styx
-# master, that is the honest signal, and a choice, not an accident. Fatal on purpose.
+# What CAN move without any push to this repository are the implementations and the
+# specification. This workflow therefore advances all four submodules to their upstream
+# HEADs and runs both harnesses against them. A red here without a corresponding red in
+# CI means Hermod, Styx or TOTP.ts master broke the frozen token format — or the
+# specification's vector annex (libs/specification) moved upstream without the vendored
+# copies and pins following — the one thing this repository exists to notice, preferably
+# before a release does. Like Hermod building against Styx master, that is the honest
+# signal, and a choice, not an accident. Fatal on purpose.
 #
 # Two things worth knowing about scheduled workflows: they only ever run on the default
 # branch, and GitHub disables them after 60 days without any repository activity. If this

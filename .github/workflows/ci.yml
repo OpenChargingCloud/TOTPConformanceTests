@@ -30,13 +30,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Checkout (no submodules needed)
+      - name: Checkout
         uses: actions/checkout@v7
+
+      # Only the specification submodule: generator and annex both live there
+      # (Whitepapers/TimeBasedOneTimePasswords). The vendored copies inside the
+      # implementation submodules are guarded by VendoredCopiesTests in the C#
+      # harness instead — no need to clone Hermod, Styx and TOTP.TS here.
+      - name: Checkout the specification submodule
+        run: git submodule update --init libs/specification
 
       # Re-derives the hand-cross-validated anchors and fails when the
       # committed JSON differs from what the generator emits.
       - name: Verify anchors and generated vector files
-        run: python3 tools/generate-test-vectors.py --check
+        run: python3 libs/specification/TimeBasedOneTimePasswords/tools/generate-test-vectors.py --check
 
   csharp:
     name: "C# harness: Hermod (${{ matrix.leg }})"
