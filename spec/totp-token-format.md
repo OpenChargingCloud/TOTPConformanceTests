@@ -34,7 +34,10 @@ design space is deliberately larger:
 Typical uses in the Open Charging Cloud ecosystem include OCPP QR-code based
 payment and authorization flows (secure dynamic QR codes), a drop-in
 replacement for legacy HTTP Basic Auth in constrained environments, and
-adding time-limiting to OCPI-style token authentication.
+adding time-limiting to OCPI-style token authentication. The HTTP bindings —
+the `Authorization: TOTP` scheme and the `TOTP` request header — are
+specified in the companion document
+[totp-http-authentication.md](totp-http-authentication.md).
 
 ### 1.1. Relationship to RFC 6238
 
