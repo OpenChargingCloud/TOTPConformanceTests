@@ -251,6 +251,19 @@ context instead of the header, and — for type `1` — the exporter material of
 the receiving TLS session applied to the token derivation on the verifier's
 side as well.
 
+### 6.4. Caching
+
+Generic HTTP caches do not know that the `TOTP` header carries a
+credential: the request looks unauthenticated to them, so a shared cache
+could store a response to an authenticated request and serve it to an
+unauthenticated client. Servers authenticating via the `TOTP` request
+header MUST therefore mark such responses `Cache-Control: private` (or
+`no-store`). `Vary: TOTP` is NOT a substitute — with tokens changing every
+validity interval it merely fragments the cache without expressing that the
+header is a credential. (The Authorization-based bindings of sections 4 and
+5 do not need this rule: [RFC 9111] section 3.5 already restricts caching
+of responses to requests with an `Authorization` header field.)
+
 
 ## 7. WebSocket handshakes
 
@@ -278,7 +291,66 @@ plays its other role, in dynamic QR codes (token format spec section 1.2).
    one more reason to prefer it.
 
 
-## 9. Security considerations
+## 9. Protocol considerations (RFC 9110 §16.4.2)
+
+[RFC 9110] section 16.4.2 lists considerations for new authentication
+schemes. This scheme is private-use (see the third point), but answers them
+anyway:
+
+ * **Statelessness.** Every request carries everything the verifier needs:
+   identity, type and token. Verification requires only the verifier's
+   clock and the provisioned identity → configuration mapping (section 3) —
+   no per-client session state. Two deliberate exceptions: the OPTIONAL
+   single-use enforcement of section 5.3 (anti-replay) is server state
+   bounded to one validity slot per accepted token, and a type `1` token
+   binds to the **TLS session** it was derived for (section 6.2) —
+   transport state, by design, never application session state.
+
+ * **The `realm` parameter** keeps exactly its [RFC 9110] section 11.5
+   protection-space semantics; this document does not reinterpret it. The
+   identity → configuration mapping is scoped per protection space, and a
+   client MAY send credentials preemptively for further requests within a
+   protection space it has already authenticated against.
+
+ * **token68 / auth-param.** The *challenge* direction is standard: `realm`
+   — and any future challenge parameter — uses the auth-param syntax. The
+   *credentials* deliberately use neither `token68` nor auth-params but the
+   fixed two-parameter form of section 5.1: compact, and symmetric with the
+   `TOTP` request header. That deviates from the "new schemes ought to use
+   auth-param" advice — acceptable for a private-use scheme whose name
+   `TOTP` is **not** registered in the IANA HTTP Authentication Scheme
+   Registry. Generic HTTP libraries treating the credentials as opaque is
+   expected and fine. Should IANA registration ever be pursued, the
+   credentials would migrate to auth-param syntax (e.g.
+   `TOTP type=1, id="…", totp="…"`).
+
+ * **Unknown parameters.** In *credentials*: **must-reject** — anything
+   beyond the grammar of section 5.1 fails parsing (the `extra-parameter`
+   entry of the invalid-header vectors pins this). A closed grammar fails
+   closed; for an authentication scheme, ambiguity is worse than
+   inflexibility. Extensibility lives in the **type digit** (`0` and `1`
+   today; future revisions of this document may define further digits), not
+   in ignorable parameters. In *challenges*: clients MUST ignore unknown
+   auth-params, as [RFC 9110] already requires.
+
+ * **Origin-server and proxy authentication.** The scheme is designed for
+   origin-server authentication (`401` / `WWW-Authenticate` /
+   `Authorization`). It MAY be used for proxy authentication (`407` /
+   `Proxy-Authenticate` / `Proxy-Authorization`) with type `0` tokens,
+   where the proxy holds the identity's configuration. Type `1` is only
+   meaningful when the verifier is the TLS endpoint of the connection
+   carrying the request — with classic CONNECT tunneling a proxy is not,
+   so type `1` MUST NOT be used for proxy authentication there.
+
+ * **Caching.** For the Basic binding and the `Authorization: TOTP` scheme
+   the credentials travel in the `Authorization` header field, which HTTP
+   caches already treat specially ([RFC 9111] section 3.5: shared caches do
+   not store such responses unless response directives explicitly allow
+   it). The `TOTP` request header is invisible to generic caches — the
+   normative rule of section 6.4 exists for exactly that reason.
+
+
+## 10. Security considerations
 
  * **TLS is REQUIRED** for the Basic binding, the `Authorization: TOTP`
    scheme and type `0` of the `TOTP` header: a raw token is replayable
@@ -291,16 +363,11 @@ plays its other role, in dynamic QR codes (token format spec section 1.2).
    constant-time comparison, single-use enforcement per (identity, slot,
    token) where replay matters, rate limiting of failed attempts, clock
    synchronization, and randomly generated secrets of at least 128 bits.
- * The scheme name `TOTP` is **not** registered in the IANA HTTP
-   Authentication Scheme Registry; this is a private-use scheme between
-   consenting implementations. Its two whitespace-separated parameters also
-   do not follow the generic `token68`/auth-param credentials grammar of
-   [RFC 9110] section 11.4 — generic HTTP libraries treat such a value as
-   opaque, which is fine, and one more reason the scheme stays private-use
-   (informative).
+ * Registration status, credentials grammar and caching interplay are
+   protocol properties, not vulnerabilities — see section 9.
 
 
-## 10. Test vectors (normative for the native scheme)
+## 11. Test vectors (normative for the native scheme)
 
 The `Authorization: TOTP` scheme is covered by canonical vectors:
 [`TestVectors/totp-http-auth-vectors.json`](../TestVectors/totp-http-auth-vectors.json),
@@ -324,7 +391,7 @@ request header's value is a bare token (its wire format is trivial); its
 type semantics are exercised through the scheme vectors.
 
 
-## 11. References
+## 12. References
 
  * [Token format specification](totp-token-format.md) — the tokens carried here
  * [RFC 2119] / [RFC 8174] — Key words for use in RFCs
@@ -333,6 +400,7 @@ type semantics are exercised through the scheme vectors.
  * [RFC 7617] — The 'Basic' HTTP Authentication Scheme
  * [RFC 8446] — The Transport Layer Security (TLS) Protocol Version 1.3
  * [RFC 9110] — HTTP Semantics
+ * [RFC 9111] — HTTP Caching
 
 [RFC 2119]: https://www.rfc-editor.org/rfc/rfc2119
 [RFC 4648]: https://www.rfc-editor.org/rfc/rfc4648
@@ -341,6 +409,7 @@ type semantics are exercised through the scheme vectors.
 [RFC 8174]: https://www.rfc-editor.org/rfc/rfc8174
 [RFC 8446]: https://www.rfc-editor.org/rfc/rfc8446
 [RFC 9110]: https://www.rfc-editor.org/rfc/rfc9110
+[RFC 9111]: https://www.rfc-editor.org/rfc/rfc9111
 
 
 ## Appendix A — Implementation status (informative)
