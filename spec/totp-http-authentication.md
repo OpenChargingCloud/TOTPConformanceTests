@@ -218,10 +218,11 @@ For deployments where the peer's login is already established — a mutual
 TLS connection, a per-client URL path, an already-authenticated session —
 the token travels in a dedicated request header, prefixed with a one-digit
 **type**. This binding descends from the proprietary `Token`-style
-authentication familiar from e-mobility protocols such as OCPI
-(`Authorization: Token <static-token>`): the same lightweight shape, except
-that the token now exchanges itself every validity interval instead of
-being a static, long-lived secret.
+authentication that GitHub's REST API originally defined
+(`Authorization: token <token>`) and that e-mobility protocols such as OCPI
+later adopted (`Authorization: Token <static-token>`): the same lightweight
+shape, except that the token now exchanges itself every validity interval
+instead of being a static, long-lived secret.
 
 ```abnf
 TOTP-header  = "TOTP:" OWS totp-type SP totp-value OWS
