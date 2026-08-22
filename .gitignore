@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+.vs/
+
+# Node
+node_modules/
+dist/
+
+# Specification material that must not be redistributed: keep local.
+# (The OCPP extract in specs/ is fine: OCPP is published under CC BY-ND 4.0.)
+specs_localOnly/
+
+# OS
+.DS_Store
+Thumbs.db

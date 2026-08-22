@@ -1,0 +1,41 @@
+<!--
+  Common build settings for all TOTPConformanceTests projects.
+
+  Note: submodules under "libs/" are shielded from this file by libs/Directory.Build.props.
+-->
+<Project>
+
+  <PropertyGroup>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Conformance code: no sloppiness tolerated in our own sources. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+
+    <NeutralLanguage>en</NeutralLanguage>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <Company>GraphDefined GmbH</Company>
+    <Authors>GraphDefined GmbH</Authors>
+    <Copyright>Copyright © 2024-2026 GraphDefined GmbH</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/OpenChargingCloud/TOTPConformanceTests</RepositoryUrl>
+
+  </PropertyGroup>
+
+  <!-- Test projects: same everywhere, so they are declared once. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('_Tests'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('_Tests'))">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="NUnit" Version="4.6.1" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
+  </ItemGroup>
+
+</Project>

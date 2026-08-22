@@ -1,0 +1,20 @@
+{
+  "name": "@open-charging-cloud/totp-conformance-tests",
+  "version": "1.0.0",
+  "description": "Runs TOTP.ts against the canonical TOTP conformance test vectors.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "author": "GraphDefined GmbH <achim.friedland@graphdefined.com>",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.9"
+  }
+}

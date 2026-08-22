@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/TOTPConformance_Tests/TOTPConformance_Tests.csproj" />
+  </Folder>
+  <Folder Name="/Vanaheimr/">
+    <Project Path="libs/Hermod/Hermod/Hermod.csproj" />
+    <Project Path="libs/Styx/Styx/Styx.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,5 @@
+# The vector files are generated with LF line endings; the drift guard
+# (tools/generate-test-vectors.py --check) compares them byte for byte,
+# so git must never rewrite them.
+TestVectors/*.json text eol=lf
+tools/*.py         text eol=lf
