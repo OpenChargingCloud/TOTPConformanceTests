@@ -70,22 +70,36 @@ the requirements on the secret itself).
 
 ```abnf
 credentials  = "TOTP" SP totp-cred
-totp-cred    = base64-user ":" base64-totp
+totp-cred    = [ totp-type ":" ] base64-user ":" base64-totp
+totp-type    = "0" / "1"
 base64-user  = <Base64 of the UTF-8 encoded identity>
 base64-totp  = <Base64 of the UTF-8 encoded TOTP>
 ```
 
 The scheme name is matched case-insensitively. `totp-cred` is a single
-whitespace-free parameter containing exactly one `":"` at the boundary of
-the two Base64 values.
+whitespace-free parameter of two or three `":"`-separated segments. Base64
+never contains a `":"`, so the split is unambiguous.
 
-Example — identity `chargingstation-0001`, token `CN63y502maVh` (the
+The OPTIONAL leading `totp-type` has the same semantics as in the `TOTP`
+request header (section 5.1): `0` for a raw token, `1` for a token bound to
+this TLS session (section 5.2). **Two segments imply type `0`** — the raw
+form needs no digit, and senders SHOULD omit `0:`. Verifiers MUST reject a
+three-segment credential whose first segment is not `0` or `1`.
+
+Example — identity `chargingstation-0001`, raw token `CN63y502maVh` (the
 `defaults-mid-slot` vector of the canonical test vectors):
 
 ```http
 GET /ocpp HTTP/1.1
 Host: csms.example.com
 Authorization: TOTP Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Q042M3k1MDJtYVZo
+```
+
+The same identity with a TLS-channel-bound token (`gAzxPfYtmRgd`, the
+`tls-binding-sha256` vector):
+
+```http
+Authorization: TOTP 1:Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Z0F6eFBmWXRtUmdk
 ```
 
 Unlike Basic Authentication — which Base64-encodes `user:password` as one
@@ -104,14 +118,18 @@ clients MUST NOT send a cached token beyond that.
 
 On receiving the header, the verifier:
 
-1. Splits `totp-cred` at the `":"`, Base64-decodes both parts, and
-   UTF-8-decodes them into identity and presented token. Malformed
-   encodings are rejected as malformed (section 7).
+1. Splits `totp-cred` at the `":"`. Three segments: the first is the type
+   digit; two segments: type `0`. The remaining two segments are
+   Base64-decoded and UTF-8-decoded into identity and presented token.
+   Malformed encodings, unknown type digits and any other segment count are
+   rejected as malformed (section 7).
 2. Looks up the TOTP configuration for the identity. An unknown identity is
    rejected exactly like a wrong token (section 7).
 3. Computes `previous`, `current` and `next` for its own clock and the
-   identity's configuration, and accepts iff the presented token equals one
-   of the three — the acceptance window of token format spec section 7,
+   identity's configuration — for type `1` with the exporter material of the
+   receiving TLS session applied on the verifier's side as well, under the
+   rules of section 5.2 — and accepts iff the presented token equals one
+   of the three: the acceptance window of token format spec section 7,
    including its guidance: constant-time comparison, no widening of the
    window, single-use enforcement and rate limiting where replay matters.
 
@@ -173,6 +191,10 @@ Type `1` MUST only be used on TLS v1.3 (or newer) connections — earlier TLS
 versions have no exporter interface with these properties. A verifier that
 cannot derive exporter material for the receiving connection MUST reject a
 type `1` token; it MUST NOT fall back to verifying it as type `0`.
+
+These rules apply to type `1` in **either** binding — the `TOTP` request
+header and the `Authorization: TOTP` scheme (section 4.1) carry the same
+type semantics.
 
 ### 5.3. Verification
 
@@ -259,7 +281,7 @@ implementation exists.
 | Piece | Hermod | TOTP.ts |
 |-------|--------|---------|
 | Token derivation | yes | yes |
-| `Authorization: TOTP` — build & parse (`HTTPTOTPAuthentication`) | yes | no |
+| `Authorization: TOTP` — build & parse, incl. the type digit (`HTTPTOTPAuthentication`) | yes | no |
 | `TOTP` request header — build & parse (`TOTPHTTPHeader`), auto-attached by the HTTP client from its `TOTPConfig` | yes | no |
 | TLS exporter material (type `1` derivation) | yes | no |
 | Server-side verification against the identity → config mapping (`AWebSocketServer.ClientTOTPConfig`) | prepared, in progress | no |
