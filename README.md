@@ -3,7 +3,7 @@
 [![CI](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/ci.yml)
 [![Nightly](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTPConformanceTests/actions/workflows/nightly.yml)
 
-Conformance test suite for the **Open Charging Cloud TOTP token format** — the
+Conformance test suite for the **Open Charging Technology TOTP token format** — the
 machine-to-machine Time-based One-Time Password format shared by two
 independent implementations:
 

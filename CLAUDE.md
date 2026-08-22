@@ -1,6 +1,6 @@
 # TOTPConformanceTests
 
-Conformance suite for the Open Charging Cloud TOTP token format, holding two
+Conformance suite for the Open Charging Technology TOTP token format, holding two
 implementations to one set of canonical vectors: Hermod's `TOTPGenerator`
 (C#, `libs/Hermod`) and TOTP.ts (TypeScript, `libs/TOTP.TS`).
 
