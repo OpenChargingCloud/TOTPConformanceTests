@@ -69,22 +69,21 @@ the requirements on the secret itself).
 ### 4.1. Syntax
 
 ```abnf
-credentials  = "TOTP" SP totp-cred
-totp-cred    = [ totp-type ":" ] base64-user ":" base64-totp
+credentials  = "TOTP" SP totp-type SP totp-cred
 totp-type    = "0" / "1"
+totp-cred    = base64-user ":" base64-totp
 base64-user  = <Base64 of the UTF-8 encoded identity>
 base64-totp  = <Base64 of the UTF-8 encoded TOTP>
 ```
 
-The scheme name is matched case-insensitively. `totp-cred` is a single
-whitespace-free parameter of two or three `":"`-separated segments. Base64
-never contains a `":"`, so the split is unambiguous.
-
-The OPTIONAL leading `totp-type` has the same semantics as in the `TOTP`
-request header (section 5.1): `0` for a raw token, `1` for a token bound to
-this TLS session (section 5.2). **Two segments imply type `0`** — the raw
-form needs no digit, and senders SHOULD omit `0:`. Verifiers MUST reject a
-three-segment credential whose first segment is not `0` or `1`.
+The scheme name is matched case-insensitively. The type digit is
+**MANDATORY** and has the same semantics as in the `TOTP` request header
+(section 5.1), which puts its type digit before the value in the very same
+way: `0` for a raw token, `1` for a token bound to this TLS session
+(section 5.2). Verifiers MUST reject credentials without a type digit and
+credentials whose type digit is neither `0` nor `1`. `totp-cred` is a
+single whitespace-free parameter; Base64 never contains a `":"`, so its
+split is unambiguous.
 
 Example — identity `chargingstation-0001`, raw token `CN63y502maVh` (the
 `defaults-mid-slot` vector of the canonical test vectors):
@@ -92,14 +91,14 @@ Example — identity `chargingstation-0001`, raw token `CN63y502maVh` (the
 ```http
 GET /ocpp HTTP/1.1
 Host: csms.example.com
-Authorization: TOTP Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Q042M3k1MDJtYVZo
+Authorization: TOTP 0 Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Q042M3k1MDJtYVZo
 ```
 
 The same identity with a TLS-channel-bound token (`gAzxPfYtmRgd`, the
 `tls-binding-sha256` vector):
 
 ```http
-Authorization: TOTP 1:Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Z0F6eFBmWXRtUmdk
+Authorization: TOTP 1 Y2hhcmdpbmdzdGF0aW9uLTAwMDE=:Z0F6eFBmWXRtUmdk
 ```
 
 Unlike Basic Authentication — which Base64-encodes `user:password` as one
@@ -118,11 +117,11 @@ clients MUST NOT send a cached token beyond that.
 
 On receiving the header, the verifier:
 
-1. Splits `totp-cred` at the `":"`. Three segments: the first is the type
-   digit; two segments: type `0`. The remaining two segments are
-   Base64-decoded and UTF-8-decoded into identity and presented token.
-   Malformed encodings, unknown type digits and any other segment count are
-   rejected as malformed (section 7).
+1. Reads the type digit and splits `totp-cred` at the `":"` into exactly
+   two segments, which are Base64-decoded and UTF-8-decoded into identity
+   and presented token. A missing or unknown type digit, malformed
+   encodings and any other segment count are rejected as malformed
+   (section 7).
 2. Looks up the TOTP configuration for the identity. An unknown identity is
    rejected exactly like a wrong token (section 7).
 3. Computes `previous`, `current` and `next` for its own clock and the
@@ -244,7 +243,11 @@ other role, in dynamic QR codes (token format spec section 1.2).
    synchronization, and randomly generated secrets of at least 128 bits.
  * The scheme name `TOTP` is **not** registered in the IANA HTTP
    Authentication Scheme Registry; this is a private-use scheme between
-   consenting implementations (informative).
+   consenting implementations. Its two whitespace-separated parameters also
+   do not follow the generic `token68`/auth-param credentials grammar of
+   [RFC 9110] section 11.4 — generic HTTP libraries treat such a value as
+   opaque, which is fine, and one more reason the scheme stays private-use
+   (informative).
 
 
 ## 9. Test vectors
