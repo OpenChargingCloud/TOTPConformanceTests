@@ -130,13 +130,25 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
-          cache-dependency-path: Tests/TOTPConformance_Tests.TS/package-lock.json
+          cache-dependency-path: |
+            Tests/TOTPConformance_Tests.TS/package-lock.json
+            libs/TOTP.TS/package-lock.json
 
-      # Deliberately npm ci against the committed lock file: the only variable this night
+      # Deliberately npm ci against the committed lock files: the only variable this night
       # moves is the submodules, so a red points at exactly one thing. Fresh dependency
-      # resolution for the TOTP.ts library itself is its own nightly's job.
+      # resolution for the TOTP.ts library itself is its own nightly's job — here it gets
+      # exactly the lock file its upstream HEAD ships.
       - name: Install
         run: npm --prefix Tests/TOTPConformance_Tests.TS ci
+
+      # The harness imports the implementation FROM SOURCE (libs/TOTP.TS/src/index.ts),
+      # so Node resolves that file's imports from libs/TOTP.TS/node_modules — which the
+      # harness's own install never fills. A dependency the implementation gains upstream
+      # (as TOTP.ts gained @noble/hashes when it dropped node:crypto to run outside Node)
+      # would otherwise fail this night as ERR_MODULE_NOT_FOUND, which says nothing about
+      # conformance — the very confusion this suite exists to avoid.
+      - name: Install the implementation's dependencies
+        run: npm --prefix libs/TOTP.TS ci
 
       - name: Test
         run: npm --prefix Tests/TOTPConformance_Tests.TS test

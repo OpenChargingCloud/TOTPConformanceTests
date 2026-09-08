@@ -8,7 +8,7 @@
 	branch = master
 [submodule "libs/TOTP.TS"]
 	path = libs/TOTP.TS
-	url = https://github.com/OpenChargingCloud/TOTP.ts.git
+	url = https://github.com/OpenChargingCloud/TOTP.TS.git
 	branch = master
 [submodule "libs/specification"]
 	path = libs/specification

@@ -47,9 +47,17 @@ implementations to one set of canonical vectors: Hermod's `TOTPGenerator`
 git submodule update --init --recursive
 dotnet test TOTPConformanceTests.slnx
 npm --prefix Tests/TOTPConformance_Tests.TS install
+npm --prefix libs/TOTP.TS ci
 npm --prefix Tests/TOTPConformance_Tests.TS test
 python libs/specification/TimeBasedOneTimePasswords/tools/generate-test-vectors.py --check
 ```
+
+The TS harness imports TOTP.TS from source, so the IMPLEMENTATION's own
+runtime dependencies must be installed too (Node resolves them from
+`libs/TOTP.TS/node_modules`) — since 0.3.1 the library uses `@noble/hashes`
+instead of `node:crypto`, and without that install the harness dies with
+`ERR_MODULE_NOT_FOUND` before a single vector runs. Both workflows do this
+in a separate step.
 
 Regenerating (after a generator change) additionally refreshes the vendored
 copies: append

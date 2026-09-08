@@ -8,7 +8,7 @@ machine-to-machine Time-based One-Time Password format shared by two
 independent implementations:
 
  * **[Vanaheimr Hermod](https://github.com/Vanaheimr/Hermod)** (`TOTPGenerator`, C#/.NET)
- * **[TOTP.ts](https://github.com/OpenChargingCloud/TOTP.ts)** (`@open-charging-cloud/totp`, TypeScript/Node)
+ * **[TOTP.TS](https://github.com/OpenChargingCloud/TOTP.TS)** (`@open-charging-cloud/totp`, TypeScript/Node)
 
 Both derive **byte-identical tokens** for the same shared secret, time slot,
 length, alphabet and hash algorithm. That agreement used to rest on
@@ -42,7 +42,7 @@ authentication.
 |-----------|---------|
 | [`libs/specification`](https://github.com/OpenChargingTechnology/Whitepapers) | The specification and its normative test-vector annex (`TimeBasedOneTimePasswords/`) |
 | [`libs/Hermod`](https://github.com/Vanaheimr/Hermod) | Implementation under test #1: `TOTPGenerator` (C#) |
-| [`libs/TOTP.TS`](https://github.com/OpenChargingCloud/TOTP.ts) | Implementation under test #2: `@open-charging-cloud/totp` (TypeScript) |
+| [`libs/TOTP.TS`](https://github.com/OpenChargingCloud/TOTP.TS) | Implementation under test #2: `@open-charging-cloud/totp` (TypeScript) |
 | [`libs/Styx`](https://github.com/Vanaheimr/Styx) | Foundation of Hermod |
 
 ```bash
@@ -57,10 +57,19 @@ The C# harness (requires the .NET 10 SDK):
 dotnet test TOTPConformanceTests.slnx
 ```
 
-The TypeScript harness (requires Node.js >= 18):
+The TypeScript harness (requires Node.js >= 18). It imports TOTP.TS **from
+source**, so the implementation's own runtime dependencies have to be
+installed as well — Node resolves them from `libs/TOTP.TS/node_modules`:
 
 ```bash
 npm --prefix Tests/TOTPConformance_Tests.TS install
+```
+
+```bash
+npm --prefix libs/TOTP.TS ci
+```
+
+```bash
 npm --prefix Tests/TOTPConformance_Tests.TS test
 ```
 

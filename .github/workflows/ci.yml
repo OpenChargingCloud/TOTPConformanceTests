@@ -143,10 +143,20 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
-          cache-dependency-path: Tests/TOTPConformance_Tests.TS/package-lock.json
+          cache-dependency-path: |
+            Tests/TOTPConformance_Tests.TS/package-lock.json
+            libs/TOTP.TS/package-lock.json
 
       - name: Install
         run: npm --prefix Tests/TOTPConformance_Tests.TS ci
+
+      # The harness imports the implementation FROM SOURCE (libs/TOTP.TS/src/index.ts),
+      # so Node resolves that file's imports from libs/TOTP.TS/node_modules — which the
+      # harness's own install never fills. TOTP.ts needed nothing until it swapped
+      # node:crypto for @noble/hashes to run outside Node; without this step a new
+      # runtime dependency fails as ERR_MODULE_NOT_FOUND before a single vector runs.
+      - name: Install the implementation's dependencies
+        run: npm --prefix libs/TOTP.TS ci
 
       - name: Test
         run: npm --prefix Tests/TOTPConformance_Tests.TS test
