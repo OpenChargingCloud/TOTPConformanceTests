@@ -50,9 +50,9 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
         /// <summary>
         /// Found by the "timestamp-year-9999" vector (which therefore uses
-        /// 23:59:28): within the very last slot of the calendar the EndTime
-        /// convenience value (timestamp + remaining time) would reach the year
-        /// 10000 and leave the DateTime range, so Hermod throws instead of
+        /// 23:59:28): the very last slot of the calendar ends at
+        /// 10000-01-01T00:00:00Z ((S + 1) * V, spec section 4.1), which
+        /// Hermod's DateTimeOffset EndTime cannot represent, so it throws instead of
         /// returning the - perfectly derivable - tokens. TOTP.ts returns no
         /// end time and is unaffected. Purely theoretical.
         /// </summary>

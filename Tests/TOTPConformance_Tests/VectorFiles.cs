@@ -109,6 +109,7 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         public String  Current               { get; set; } = "";
         public String  Next                  { get; set; } = "";
         public Int32   RemainingTimeSeconds  { get; set; }
+        public Int64   EndTimeUnixSeconds    { get; set; }
     }
 
 

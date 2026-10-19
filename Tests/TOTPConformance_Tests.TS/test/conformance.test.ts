@@ -83,12 +83,22 @@ describe("Generation vectors", () => {
         }
 
         it(vector.id, () => {
-            expect(run(vector.input)).toEqual({
+
+            const result = run(vector.input);
+
+            expect(result).toEqual({
                 previous:       vector.expected.previous,
                 current:        vector.expected.current,
                 next:           vector.expected.next,
                 remainingTime:  vector.expected.remainingTimeSeconds
             });
+
+            // The window ends at a fixed instant, (S + 1) * V (spec section
+            // 4.1). TOTP.ts reports whole seconds from the floored timestamp,
+            // so floor + remaining must land exactly on it.
+            expect(Math.floor(vector.input.unixTimestampMillis / 1000) + result.remainingTime)
+                .toBe(vector.expected.endTimeUnixSeconds);
+
         });
 
     }

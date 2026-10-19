@@ -59,6 +59,7 @@ export interface GenerationVector {
         current:               string;
         next:                  string;
         remainingTimeSeconds:  number;
+        endTimeUnixSeconds:    number;
     };
     requires?:    string[];
 }

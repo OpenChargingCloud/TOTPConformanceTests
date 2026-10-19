@@ -25,9 +25,9 @@ specification section 5.
 ### timestamp-year-9999 (last slot of the calendar)
 
 Found by the `timestamp-year-9999` vector, which therefore uses
-9999-12-31T23:59:**28**Z: within the very last slot of the calendar Hermod's
-`EndTime` convenience value (`timestamp + remainingTime`) would reach the
-year 10000 and leave the `DateTime` range, so `GenerateTOTPs` throws an
+9999-12-31T23:59:**28**Z: the very last slot of the calendar ends at
+10000-01-01T00:00:00Z (`endTime = (S + 1) · V`, spec section 4.1), which
+Hermod's `DateTimeOffset` `EndTime` cannot represent, so `GenerateTOTPs` throws an
 `ArgumentOutOfRangeException` instead of returning the — perfectly derivable
 — tokens. TOTP.ts returns no end time and computes the same slot fine.
 
@@ -71,6 +71,12 @@ regular `InvalidInputVectorTests` on both implementations now:
  * **Fractional token length** (`length-fractional`) is unrepresentable in
    Hermod's typed API (`UInt32`) — a rejection by construction, marked
    `notApplicable`, not a deviation.
- * **`EndTime` return value**: Hermod additionally returns
-   `timestamp + remainingTime`; TOTP.ts returns only the remaining seconds.
-   Return shapes are API surface, not token format.
+ * **`EndTime` return value**: Hermod additionally returns the window end
+   `(S + 1) · V` as a `DateTimeOffset`; TOTP.ts returns only the remaining
+   seconds. Return shapes are API surface, not token format — the vectors'
+   `endTimeUnixSeconds` holds both to the same end.
+ * **Remaining time as a duration**: Hermod measures it from the unfloored
+   timestamp, exact to the tick (24.001 s at `…785.999`); TOTP.ts and the
+   vectors count whole seconds from the floored timestamp (25 s). Spec
+   section 4.1 allows both: the exact duration's ceiling is always the
+   whole-second value, and both name the same end.
