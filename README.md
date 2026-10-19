@@ -57,7 +57,7 @@ The C# harness (requires the .NET 10 SDK):
 dotnet test TOTPConformanceTests.slnx
 ```
 
-The TypeScript harness (requires Node.js >= 18). It imports TOTP.TS **from
+The TypeScript harness (requires Node.js 22.12+, 24 or 26+ — what vitest 5 supports). It imports TOTP.TS **from
 source**, so the implementation's own runtime dependencies have to be
 installed as well — Node resolves them from `libs/TOTP.TS/node_modules`:
 
