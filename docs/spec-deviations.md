@@ -58,10 +58,11 @@ regular `InvalidInputVectorTests` on both implementations now:
 
 ## Differences that are NOT deviations
 
- * **TLS v1.3 channel binding** (spec section 6) is an OPTIONAL extension,
-   implemented by Hermod only. The vectors requiring the `tlsChannelBinding`
-   capability are skipped by the TOTP.ts harness — by design, not as a
-   deviation.
+ * **Optional capabilities** — TLS v1.3 channel binding (spec section 6) and
+   the `Authorization: TOTP` scheme of the HTTP authentication binding — are
+   implemented by both Hermod and TOTP.ts, so both harnesses run all their
+   vectors. An implementation without one would skip the vectors requiring
+   it — by design, not as a deviation.
  * **Lenient hash algorithm parsing**: Hermod's
    `TOTPHashAlgorithmExtensions.TryParse` also accepts `SHA-256`,
    `HMAC_SHA512` etc. Spec section 3 explicitly allows this (MAY).

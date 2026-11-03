@@ -17,27 +17,38 @@
 
 import { describe, expect, it } from "vitest";
 
-import { generateTOTPs, type TOTPHashAlgorithm } from "../../../libs/TOTP.TS/src/index";
+import { formatTOTPAuthorization,
+         generateTOTPs,
+         parseTOTPAuthorization,
+         type TOTPHashAlgorithm } from "../../../libs/TOTP.TS/src/index";
 
 import {
     CAPABILITIES,
     KNOWN_CAPABILITIES,
     IMPLEMENTATION_NAME,
     generationVectors,
+    httpAuthFile,
     httpAuthFileRequires,
     invalidInputVectors,
     type VectorInput
 } from "./vectors";
 
 
+function bytesOfHex(hex: string | undefined): Uint8Array | null {
+    return hex === undefined
+               ? null
+               : Uint8Array.from(hex.match(/../g) ?? [], byte => parseInt(byte, 16));
+}
+
 function run(input: VectorInput) {
     return generateTOTPs({
-        sharedSecret:   input.sharedSecret,
-        validityTime:   input.validityTimeSeconds ?? null,
-        totpLength:     input.totpLength          ?? null,
-        alphabet:       input.alphabet            ?? null,
-        timestamp:      input.unixTimestampMillis,
-        hashAlgorithm: (input.hashAlgorithm       ?? null) as TOTPHashAlgorithm | null
+        sharedSecret:         input.sharedSecret,
+        validityTime:         input.validityTimeSeconds ?? null,
+        totpLength:           input.totpLength          ?? null,
+        alphabet:             input.alphabet            ?? null,
+        timestamp:            input.unixTimestampMillis,
+        hashAlgorithm:       (input.hashAlgorithm       ?? null) as TOTPHashAlgorithm | null,
+        tlsExporterMaterial:  bytesOfHex(input.tlsExporterMaterialHex)
     });
 }
 
@@ -58,12 +69,36 @@ describe("Vector files", () => {
         expect(unknown).toEqual([]);
     });
 
-    // The HTTP authentication vectors are gated as a whole file. TOTP.ts has
-    // no HTTP binding, so the skip is declared here - visible, never silent.
-    const missingHttp = httpAuthFileRequires.filter(capability => !CAPABILITIES.has(capability));
+});
 
-    if (missingHttp.length > 0)
-        it.skip(`totp-http-auth-vectors.json (requires: ${missingHttp.join(", ")})`, () => {});
+
+// The HTTP authentication vectors are gated as a whole file: should a
+// capability they require ever be missing, the skip is declared here -
+// visible, never silent.
+describe.skipIf(httpAuthFileRequires.some(capability => !CAPABILITIES.has(capability)))("HTTP authentication vectors", () => {
+
+    it("are loaded", () => {
+        expect(httpAuthFile.vectors.length).       toBeGreaterThanOrEqual(5);
+        expect(httpAuthFile.parseVectors.length).  toBeGreaterThanOrEqual(9);
+        expect(httpAuthFile.invalidHeaders.length).toBeGreaterThanOrEqual(17);
+    });
+
+    // Round trip: the canonical header out, and the same credentials back in.
+    for (const vector of httpAuthFile.vectors)
+        it(`round-trip: ${vector.id}`, () => {
+            expect(formatTOTPAuthorization(vector.input)).toBe(vector.expected.header);
+            expect(parseTOTPAuthorization(vector.expected.header)).toEqual(vector.input);
+        });
+
+    for (const vector of httpAuthFile.parseVectors)
+        it(`parse: ${vector.id}`, () => {
+            expect(parseTOTPAuthorization(vector.header)).toEqual(vector.expected);
+        });
+
+    for (const vector of httpAuthFile.invalidHeaders)
+        it(`reject: ${vector.id}`, () => {
+            expect(() => parseTOTPAuthorization(vector.header)).toThrow();
+        });
 
 });
 

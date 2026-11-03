@@ -64,9 +64,9 @@ copies: append
 `--mirror libs/Hermod/HermodTests/TOTP/TestVectors --mirror libs/TOTP.TS/test/vectors`.
 
 Expected: C# 104 passed / 1 skipped (length-fractional, not representable in
-the UInt32 API), TS 58 passed / 4 skipped (TLS channel binding vectors and
-the HTTP-auth vector file — Hermod-only capabilities). Skips are
-load-bearing, not noise.
+the UInt32 API), TS 93 passed / 0 skipped (TOTP.ts implements both optional
+capabilities, `tlsChannelBinding` and `httpAuthentication`, since TOTP.TS
+eaea295). Skips are load-bearing, not noise.
 
 ## Ground rules
 

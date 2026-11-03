@@ -112,8 +112,9 @@ pins here).
    drifts — see the
    [annex README](https://github.com/OpenChargingTechnology/Whitepapers/tree/master/TimeBasedOneTimePasswords/test-vectors).
 
-Vectors marked `requires: ["tlsChannelBinding"]` are skipped by harnesses
-without that capability; invalid-input vectors marked
+Vectors marked `requires: [...]` are skipped by harnesses without the named
+capability — today neither harness skips any, since Hermod and TOTP.ts both
+implement `tlsChannelBinding` and `httpAuthentication`; invalid-input vectors marked
 `knownDeviations`/`notApplicable` are skipped by the named implementation and
 pinned by characterization tests instead — the semantics are documented in
 the annex README.

@@ -24,10 +24,14 @@ import { readFileSync } from "node:fs";
 export const IMPLEMENTATION_NAME = "totp.ts";
 
 /**
- * The optional capabilities TOTP.ts provides ("requires" lists of vectors).
- * TLS v1.3 channel binding is a Hermod-only extension so far.
+ * The optional capabilities TOTP.ts provides ("requires" lists of vectors):
+ * TLS v1.3 channel binding (the tlsExporterMaterial option) and the
+ * "Authorization: TOTP" scheme (formatTOTPAuthorization/parseTOTPAuthorization).
  */
-export const CAPABILITIES: ReadonlySet<string> = new Set([]);
+export const CAPABILITIES: ReadonlySet<string> = new Set([
+    "tlsChannelBinding",
+    "httpAuthentication"
+]);
 
 /**
  * Every capability name that exists in the vector format at all. A vector
@@ -73,6 +77,32 @@ export interface InvalidInputVector {
     notApplicable?:    string[];
 }
 
+export interface HttpAuthCredentials {
+    login:  string;
+    totp:   string;
+    tlscb:  boolean;
+}
+
+export interface HttpAuthRoundTripVector {
+    id:           string;
+    description:  string;
+    input:        HttpAuthCredentials;
+    expected:     { header: string };
+}
+
+export interface HttpAuthParseVector {
+    id:           string;
+    description:  string;
+    header:       string;
+    expected:     HttpAuthCredentials;
+}
+
+export interface HttpAuthInvalidHeader {
+    id:           string;
+    description:  string;
+    header:       string;
+}
+
 interface VectorFile<T> {
     specification:  string;
     description:    string;
@@ -80,20 +110,24 @@ interface VectorFile<T> {
     vectors:        T[];
 }
 
-
-function load<T>(fileName: string): VectorFile<T> {
-    return JSON.parse(
-        readFileSync(new URL(`../../../libs/specification/TimeBasedOneTimePasswords/test-vectors/${fileName}`, import.meta.url), "utf-8")
-    ) as VectorFile<T>;
+interface HttpAuthVectorFile extends VectorFile<HttpAuthRoundTripVector> {
+    parseVectors:    HttpAuthParseVector[];
+    invalidHeaders:  HttpAuthInvalidHeader[];
 }
 
-export const generationVectors    = load<GenerationVector>  ("totp-test-vectors.json").vectors;
-export const invalidInputVectors  = load<InvalidInputVector>("totp-invalid-inputs.json").vectors;
+
+function load(fileName: string): unknown {
+    return JSON.parse(
+        readFileSync(new URL(`../../../libs/specification/TimeBasedOneTimePasswords/test-vectors/${fileName}`, import.meta.url), "utf-8")
+    );
+}
+
+export const generationVectors    = (load("totp-test-vectors.json")   as VectorFile<GenerationVector>).vectors;
+export const invalidInputVectors  = (load("totp-invalid-inputs.json") as VectorFile<InvalidInputVector>).vectors;
 
 /**
  * The HTTP authentication vectors (totp-http-authentication.md of the
- * specification) are capability-gated as a whole file: TOTP.ts implements no
- * HTTP binding, so this harness only checks the gate and skips the file
- * DECLARATIVELY.
+ * specification) are capability-gated as a whole file, not per vector.
  */
-export const httpAuthFileRequires = load<unknown>("totp-http-auth-vectors.json").requires ?? [];
+export const httpAuthFile          = load("totp-http-auth-vectors.json") as HttpAuthVectorFile;
+export const httpAuthFileRequires  = httpAuthFile.requires ?? [];
