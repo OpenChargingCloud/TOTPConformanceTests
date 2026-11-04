@@ -30,6 +30,8 @@ import {
     httpAuthFile,
     httpAuthFileRequires,
     invalidInputVectors,
+    verificationFile,
+    verificationFileRequires,
     type VectorInput
 } from "./vectors";
 
@@ -64,7 +66,8 @@ describe("Vector files", () => {
         // A new capability in the vector files must fail here, so that it
         // cannot be skipped silently.
         const unknown = [ ...generationVectors.flatMap(vector => vector.requires ?? []),
-                          ...httpAuthFileRequires ]
+                          ...httpAuthFileRequires,
+                          ...verificationFileRequires ]
             .filter(capability => !KNOWN_CAPABILITIES.has(capability));
         expect(unknown).toEqual([]);
     });
@@ -99,6 +102,29 @@ describe.skipIf(httpAuthFileRequires.some(capability => !CAPABILITIES.has(capabi
         it(`reject: ${vector.id}`, () => {
             expect(() => parseTOTPAuthorization(vector.header)).toThrow();
         });
+
+});
+
+
+// The server verification vectors need a verifier, and TOTP.ts is none:
+// it builds and parses credentials, the server holding the login's
+// configuration verifies them. Every vector is skipped by name - visible,
+// never silent - and claiming the capability without writing a runner
+// here fails.
+describe("HTTP verification vectors", () => {
+
+    const missing = verificationFileRequires.filter(capability => !CAPABILITIES.has(capability));
+
+    it("are loaded", () => {
+        expect(verificationFile.vectors.length).toBeGreaterThanOrEqual(20);
+    });
+
+    it("are skipped only for a capability this harness lacks", () => {
+        expect(missing).not.toEqual([]);
+    });
+
+    for (const vector of verificationFile.vectors)
+        it.skip(`${vector.id} (requires: ${missing.join(", ")})`, () => {});
 
 });
 

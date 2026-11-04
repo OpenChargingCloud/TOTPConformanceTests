@@ -40,11 +40,14 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         public const String ImplementationName = "hermod";
 
         /// <summary>
-        /// The optional capabilities Hermod provides ("requires" lists of vectors).
+        /// The optional capabilities Hermod provides ("requires" lists of vectors):
+        /// server-side verification only for the WebSocket upgrade
+        /// (AWebSocketEndpoint.AuthenticateAsync against ClientTOTPConfig).
         /// </summary>
         public static readonly IReadOnlySet<String> Capabilities = new HashSet<String> {
             "tlsChannelBinding",
-            "httpAuthentication"
+            "httpAuthentication",
+            "httpVerification"
         };
 
 
@@ -53,6 +56,8 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         public static InvalidInputFile      InvalidInputs  { get; } = Load<InvalidInputFile>   ("totp-invalid-inputs.json");
 
         public static HttpAuthVectorFile    HttpAuth       { get; } = Load<HttpAuthVectorFile> ("totp-http-auth-vectors.json");
+
+        public static VerificationFile      Verification   { get; } = Load<VerificationFile>   ("totp-http-verification-vectors.json");
 
 
         private static T Load<T>(String FileName)
@@ -163,6 +168,43 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         public String  Description  { get; set; } = "";
         public String  Header       { get; set; } = "";
         public override String ToString() => Id;
+    }
+
+    public sealed class VerificationFile
+    {
+        public List<String>              Requires  { get; set; } = [];
+        public VerificationVerifier      Verifier  { get; set; } = new();
+        public List<VerificationVector>  Vectors   { get; set; } = [];
+    }
+
+    public sealed class VerificationVerifier
+    {
+        public Int64                                   UnixTimestampMillis  { get; set; }
+        public Dictionary<String, VerificationConfig>  Logins               { get; set; } = [];
+    }
+
+    public sealed class VerificationConfig
+    {
+        public String   SharedSecret         { get; set; } = "";
+        public UInt32?  ValidityTimeSeconds  { get; set; }
+        public UInt32?  TotpLength           { get; set; }
+        public String?  Alphabet             { get; set; }
+        public String?  HashAlgorithm        { get; set; }
+    }
+
+    public sealed class VerificationVector
+    {
+        public String                Id             { get; set; } = "";
+        public String                Description    { get; set; } = "";
+        public String?               Authorization  { get; set; }
+        public VerificationExpected  Expected       { get; set; } = new();
+        public override String ToString() => Id;
+    }
+
+    public sealed class VerificationExpected
+    {
+        public String   Outcome  { get; set; } = "";
+        public String?  Login    { get; set; }
     }
 
     public sealed class InvalidInputVector

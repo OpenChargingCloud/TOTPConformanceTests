@@ -23,7 +23,8 @@ implementations to one set of canonical vectors: Hermod's `TOTPGenerator`
   generator refuses to write when the hand-cross-validated anchors mismatch.
   `--check` is the CI drift guard and compares byte-for-byte (Whitepapers'
   `.gitattributes` forces LF on the annex). The `--mirror` flags refresh the
-  VENDORED COPIES inside the implementation submodules
+  VENDORED COPIES (every file but the server verification vectors, which
+  only this suite runs) inside the implementation submodules
   (`libs/Hermod/HermodTests/TOTP/TestVectors/`, `libs/TOTP.TS/test/vectors/`)
   — the implementations' own suites run against those, and
   `VendoredCopiesTests` fails when a copy drifts. After regenerating, commit
@@ -63,10 +64,13 @@ Regenerating (after a generator change) additionally refreshes the vendored
 copies: append
 `--mirror libs/Hermod/HermodTests/TOTP/TestVectors --mirror libs/TOTP.TS/test/vectors`.
 
-Expected: C# 104 passed / 1 skipped (length-fractional, not representable in
-the UInt32 API), TS 93 passed / 0 skipped (TOTP.ts implements both optional
-capabilities, `tlsChannelBinding` and `httpAuthentication`, since TOTP.TS
-eaea295). Skips are load-bearing, not noise.
+Expected: C# 129 passed / 1 skipped (length-fractional, not representable in
+the UInt32 API), TS 95 passed / 24 skipped (the server verification vectors:
+`httpVerification` is Hermod-only, TOTP.ts is a client library; it does
+implement `tlsChannelBinding` and `httpAuthentication`). Skips are
+load-bearing, not noise. The verification vectors run against a live Hermod
+WebSocketServer whose clock is moved with Styx's `Timestamp` time travel —
+that fixture is `NonParallelizable` and must stay so.
 
 ## Ground rules
 

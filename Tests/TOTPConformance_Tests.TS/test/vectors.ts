@@ -27,6 +27,7 @@ export const IMPLEMENTATION_NAME = "totp.ts";
  * The optional capabilities TOTP.ts provides ("requires" lists of vectors):
  * TLS v1.3 channel binding (the tlsExporterMaterial option) and the
  * "Authorization: TOTP" scheme (formatTOTPAuthorization/parseTOTPAuthorization).
+ * Not "httpVerification": TOTP.ts verifies nothing itself, servers do.
  */
 export const CAPABILITIES: ReadonlySet<string> = new Set([
     "tlsChannelBinding",
@@ -40,7 +41,8 @@ export const CAPABILITIES: ReadonlySet<string> = new Set([
  */
 export const KNOWN_CAPABILITIES: ReadonlySet<string> = new Set([
     "tlsChannelBinding",
-    "httpAuthentication"
+    "httpAuthentication",
+    "httpVerification"
 ]);
 
 
@@ -103,6 +105,24 @@ export interface HttpAuthInvalidHeader {
     header:       string;
 }
 
+export interface VerificationVector {
+    id:             string;
+    description:    string;
+    authorization:  string | null;
+    expected:       { outcome: "accepted" | "rejected" | "malformed"; login?: string };
+}
+
+interface VerificationFile {
+    specification:  string;
+    description:    string;
+    requires?:      string[];
+    verifier: {
+        unixTimestampMillis:  number;
+        logins:               Record<string, VectorInput>;
+    };
+    vectors:        VerificationVector[];
+}
+
 interface VectorFile<T> {
     specification:  string;
     description:    string;
@@ -131,3 +151,10 @@ export const invalidInputVectors  = (load("totp-invalid-inputs.json") as VectorF
  */
 export const httpAuthFile          = load("totp-http-auth-vectors.json") as HttpAuthVectorFile;
 export const httpAuthFileRequires  = httpAuthFile.requires ?? [];
+
+/**
+ * The server verification vectors (sections 5.3, 6.2 and 8), gated as a
+ * whole file as well.
+ */
+export const verificationFile          = load("totp-http-verification-vectors.json") as VerificationFile;
+export const verificationFileRequires  = verificationFile.requires ?? [];

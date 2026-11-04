@@ -61,8 +61,17 @@ regular `InvalidInputVectorTests` on both implementations now:
  * **Optional capabilities** — TLS v1.3 channel binding (spec section 6) and
    the `Authorization: TOTP` scheme of the HTTP authentication binding — are
    implemented by both Hermod and TOTP.ts, so both harnesses run all their
-   vectors. An implementation without one would skip the vectors requiring
-   it — by design, not as a deviation.
+   vectors. Server-side verification (`httpVerification`) is Hermod's alone:
+   TOTP.ts is a client library, and its harness skips those vectors — by
+   design, not as a deviation.
+ * **Malformed credentials answered with 401**: Hermod's WebSocket server
+   does not tell a malformed `Authorization` header from a failed one —
+   HTTP binding section 8 allows that (MAY), and the verification vectors'
+   `malformed` accepts `400` or `401`.
+ * **Channel-bound credentials always rejected**: Hermod's WebSocket server
+   has no TLS exporter material (`SslStream` exposes none), so it rejects
+   every bound token — what HTTP binding section 6.2 requires of such a
+   verifier. A gap in the feature, not a deviation from the text.
  * **Lenient hash algorithm parsing**: Hermod's
    `TOTPHashAlgorithmExtensions.TryParse` also accepts `SHA-256`,
    `HMAC_SHA512` etc. Spec section 3 explicitly allows this (MAY).

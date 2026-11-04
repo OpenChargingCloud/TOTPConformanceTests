@@ -28,9 +28,9 @@ authentication.
 
 | Directory | Content |
 |-----------|---------|
-| [`libs/specification`](https://github.com/OpenChargingTechnology/Whitepapers/tree/master/TimeBasedOneTimePasswords) | **The specification** (git submodule → `TimeBasedOneTimePasswords/` in OpenChargingTechnology/Whitepapers): the token format (v1.0, final — frozen by deployed verifiers, described exactly as implemented), the HTTP bindings (v1.0, draft — Basic migration path, the `Authorization: TOTP` auth-params scheme, the `TOTP` request header), the **normative test-vector annex** this suite executes (38 generation vectors including the OCPP 2.1 "TOTP algorithm, version 1" profile, 18 invalid-input vectors, the HTTP header vectors — generated, never hand-edited), and the vector generator (an independent third implementation verifying the hand-cross-validated anchors before writing anything). |
-| `Tests/TOTPConformance_Tests/` | The **C# harness** (NUnit): runs Hermod's `TOTPGenerator` against the vectors, plus format property tests and characterization tests pinning the known deviations. |
-| `Tests/TOTPConformance_Tests.TS/` | The **TypeScript harness** (vitest): runs TOTP.ts against the same vectors, plus the same format property tests. |
+| [`libs/specification`](https://github.com/OpenChargingTechnology/Whitepapers/tree/master/TimeBasedOneTimePasswords) | **The specification** (git submodule → `TimeBasedOneTimePasswords/` in OpenChargingTechnology/Whitepapers): the token format (v1.0, final — frozen by deployed verifiers, described exactly as implemented), the HTTP bindings (v1.0, draft — Basic migration path, the `Authorization: TOTP` auth-params scheme, the `TOTP` request header), the **normative test-vector annex** this suite executes (38 generation vectors including the OCPP 2.1 "TOTP algorithm, version 1" profile, 18 invalid-input vectors, the HTTP header vectors, 24 server verification vectors — generated, never hand-edited), and the vector generator (an independent third implementation verifying the hand-cross-validated anchors before writing anything). |
+| `Tests/TOTPConformance_Tests/` | The **C# harness** (NUnit): runs Hermod's `TOTPGenerator` against the vectors, its WebSocket server against the verification vectors (a live server, its clock moved to the vectors' instant, each `Authorization` header sent byte for byte), plus format property tests and characterization tests pinning the known deviations. |
+| `Tests/TOTPConformance_Tests.TS/` | The **TypeScript harness** (vitest): runs TOTP.ts against the same vectors, plus the same format property tests. TOTP.ts is a client library and verifies nothing itself, so it skips the verification vectors, each by name. |
 | [`docs/spec-deviations.md`](docs/spec-deviations.md) | What the implementations deviate in, pinned by characterization tests so a fix cannot go unnoticed. The input validation gaps this suite found in Hermod are fixed; remaining: a theoretical year-9999 `EndTime` overflow. |
 | [`docs/ocpp-totp-comparison.md`](docs/ocpp-totp-comparison.md) | The format's origin story, held to account: OCPP 2.1 (use case C25) already uses this token format for dynamic QR-code payments — its "TOTP algorithm, version 1" is the sha256/Base62 profile of the spec. The document maps the OCPP text to spec and implementations and lists where the OCPP text should be modernized (shared-secret minimum, URL placeholder vocabulary, test vectors, ...). |
 | [`specs/`](specs/) | Verbatim extract of the TOTP-related sections of OCPP 2.1 Edition 2, Part 2 (use case C25, "TOTP algorithm, version 1", `WebPaymentsCtrlr`) — redistributed under the source document's CC BY-ND 4.0 license, © Open Charge Alliance. |
@@ -95,8 +95,10 @@ pins here).
    hand-cross-validated between Hermod and TOTP.ts before this suite
    existed — and refuses to write when even one mismatches.
 2. Every emitted vector is then confirmed by **both** implementation
-   harnesses (the TLS channel binding vectors by Hermod and the generator —
-   TOTP.ts does not implement that extension).
+   harnesses — except the server verification vectors, which only Hermod's
+   harness runs: there the generator decides each outcome with a verifier
+   of its own, and refuses to write when it disagrees with the outcome the
+   vector was written to show.
 3. CI runs the generator in `--check` mode against the pinned specification
    submodule, so hand-edits of the annex and generator drift are caught.
 4. The CI gate runs against the pinned submodules on Windows and Debian 13
@@ -113,8 +115,9 @@ pins here).
    [annex README](https://github.com/OpenChargingTechnology/Whitepapers/tree/master/TimeBasedOneTimePasswords/test-vectors).
 
 Vectors marked `requires: [...]` are skipped by harnesses without the named
-capability — today neither harness skips any, since Hermod and TOTP.ts both
-implement `tlsChannelBinding` and `httpAuthentication`; invalid-input vectors marked
+capability — Hermod and TOTP.ts both implement `tlsChannelBinding` and
+`httpAuthentication`, only Hermod `httpVerification`, so the TypeScript
+harness skips the 24 verification vectors; invalid-input vectors marked
 `knownDeviations`/`notApplicable` are skipped by the named implementation and
 pinned by characterization tests instead — the semantics are documented in
 the annex README.
