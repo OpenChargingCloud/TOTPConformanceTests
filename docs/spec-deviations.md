@@ -68,10 +68,13 @@ regular `InvalidInputVectorTests` on both implementations now:
    does not tell a malformed `Authorization` header from a failed one —
    HTTP binding section 8 allows that (MAY), and the verification vectors'
    `malformed` accepts `400` or `401`.
- * **Channel-bound credentials always rejected**: Hermod's WebSocket server
-   has no TLS exporter material (`SslStream` exposes none), so it rejects
-   every bound token — what HTTP binding section 6.2 requires of such a
-   verifier. A gap in the feature, not a deviation from the text.
+ * **Channel-bound credentials rejected over HTTP/1.1 and HTTP/2**: there
+   Hermod's WebSocket server has no TLS exporter material (`SslStream`
+   exposes none), so it rejects every bound token — what HTTP binding
+   section 6.2 requires of such a verifier. Over HTTP/3 it takes the
+   material from its own QUIC and verifies bound tokens. The verification
+   vectors run over plain TCP and hold the rejection. A limit of the TLS
+   library, not a deviation from the text.
  * **Lenient hash algorithm parsing**: Hermod's
    `TOTPHashAlgorithmExtensions.TryParse` also accepts `SHA-256`,
    `HMAC_SHA512` etc. Spec section 3 explicitly allows this (MAY).

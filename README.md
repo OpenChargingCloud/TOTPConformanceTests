@@ -51,7 +51,7 @@ git clone --recurse-submodules https://github.com/OpenChargingCloud/TOTPConforma
 
 ## Building and testing
 
-The C# harness (requires the .NET 10 SDK):
+The C# harness (requires the .NET 11 SDK):
 
 ```bash
 dotnet test TOTPConformanceTests.slnx
