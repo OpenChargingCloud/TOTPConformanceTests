@@ -154,7 +154,6 @@ namespace cloud.charging.open.TOTP.Conformance.tests
     {
         public String   Login  { get; set; } = "";
         public String   Totp   { get; set; } = "";
-        public Boolean  Tlscb  { get; set; }
     }
 
     public sealed class HttpAuthExpected
@@ -190,6 +189,7 @@ namespace cloud.charging.open.TOTP.Conformance.tests
         public UInt32?  TotpLength           { get; set; }
         public String?  Alphabet             { get; set; }
         public String?  HashAlgorithm        { get; set; }
+        public Boolean? TlsChannelBinding    { get; set; }
     }
 
     public sealed class VerificationVector

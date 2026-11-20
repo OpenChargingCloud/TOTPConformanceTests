@@ -82,7 +82,6 @@ export interface InvalidInputVector {
 export interface HttpAuthCredentials {
     login:  string;
     totp:   string;
-    tlscb:  boolean;
 }
 
 export interface HttpAuthRoundTripVector {

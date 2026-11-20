@@ -68,13 +68,21 @@ regular `InvalidInputVectorTests` on both implementations now:
    does not tell a malformed `Authorization` header from a failed one —
    HTTP binding section 8 allows that (MAY), and the verification vectors'
    `malformed` accepts `400` or `401`.
- * **Channel-bound credentials rejected over HTTP/1.1 and HTTP/2**: there
-   Hermod's WebSocket server has no TLS exporter material (`SslStream`
-   exposes none), so it rejects every bound token — what HTTP binding
-   section 6.2 requires of such a verifier. Over HTTP/3 it takes the
-   material from its own QUIC and verifies bound tokens. The verification
-   vectors run over plain TCP and hold the rejection. A limit of the TLS
-   library, not a deviation from the text.
+ * **Logins configured for channel binding rejected over HTTP/1.1 and
+   HTTP/2**: there Hermod's WebSocket server has no TLS exporter material
+   (`SslStream` exposes none), so it lets in no token of a login whose
+   `TOTPConfig` asks for binding (`TLSChannelBinding`) — what HTTP binding
+   sections 5.3 and 6.2 require of such a verifier. Over HTTP/3 it takes
+   the material from its own QUIC and verifies bound tokens. The
+   verification vectors run over plain TCP and hold the rejection, a
+   withdrawn `tlscb=false` changing nothing. A limit of the TLS library,
+   not a deviation from the text.
+ * **No `tlscb` in `Authorization: TOTP`**: Hermod `2c8a5d72` (2026-11-19)
+   took the binding flag out of the header — whether a token is bound is
+   the login's configuration. The specification followed (2026-11-20),
+   TOTP.ts 0.5.0 as well; both parsers ignore a `tlscb` like any unknown
+   parameter. Not a deviation any more, recorded because the nightly of
+   2026-11-20 went red on it before the specification moved.
  * **Lenient hash algorithm parsing**: Hermod's
    `TOTPHashAlgorithmExtensions.TryParse` also accepts `SHA-256`,
    `HMAC_SHA512` etc. Spec section 3 explicitly allows this (MAY).

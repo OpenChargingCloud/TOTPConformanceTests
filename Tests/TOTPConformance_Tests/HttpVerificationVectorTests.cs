@@ -93,8 +93,8 @@ namespace cloud.charging.open.TOTP.Conformance.tests
                                                          : null,
                                                      config.TotpLength,
                                                      config.Alphabet,
-                                                     UseTLSExporterMaterial: false,
-                                                     HashAlgorithm:          hashAlgorithm
+                                                     HashAlgorithm:      hashAlgorithm,
+                                                     TLSChannelBinding:  config.TlsChannelBinding
                                                  );
 
             }

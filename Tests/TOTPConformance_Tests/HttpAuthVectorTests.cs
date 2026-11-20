@@ -32,10 +32,11 @@ namespace cloud.charging.open.TOTP.Conformance.tests
     /// authentication vectors in totp-http-auth-vectors.json of the
     /// specification's annex - the "Authorization: TOTP" scheme of
     /// totp-http-authentication.md
-    /// as RFC 9110 auth-params: TOTP login="&lt;b64&gt;", totp="&lt;b64&gt;"
-    /// [, tlscb=true|false], with tlscb defaulting to TRUE. Build vectors
-    /// round-trip in both directions, parse vectors pin leniency (scheme and
-    /// value casing, parameter order, unknown-parameter must-ignore, token
+    /// as RFC 9110 auth-params: TOTP login="&lt;b64&gt;", totp="&lt;b64&gt;".
+    /// Whether the token is bound is the login's configuration, not part of
+    /// the header. Build vectors round-trip in both directions, parse vectors
+    /// pin leniency (scheme and parameter name casing, parameter order,
+    /// unknown-parameter must-ignore - the withdrawn tlscb included - token
     /// vs quoted-string form), invalid headers MUST be rejected.
     /// </summary>
     [TestFixture]
@@ -43,12 +44,6 @@ namespace cloud.charging.open.TOTP.Conformance.tests
     {
 
         #region (static) Vector sources
-
-        private static TOTPHTTPHeaderType AsType(Boolean Tlscb)
-
-            => Tlscb
-                   ? TOTPHTTPHeaderType.TLSChannelBinding
-                   : TOTPHTTPHeaderType.RAW;
 
         public static IEnumerable<TestCaseData> BuildVectors()
             => VectorFiles.HttpAuth.Vectors       .Select(vector => new TestCaseData(vector).SetArgDisplayNames(vector.Id));
@@ -98,8 +93,7 @@ namespace cloud.charging.open.TOTP.Conformance.tests
 
             var auth = HTTPTOTPAuthentication.Create(
                            Vector.Input.Login,
-                           Vector.Input.Totp,
-                           AsType(Vector.Input.Tlscb)
+                           Vector.Input.Totp
                        );
 
             Assert.That(auth.HTTPText, Is.EqualTo(Vector.Expected.Header), "build");
@@ -111,7 +105,6 @@ namespace cloud.charging.open.TOTP.Conformance.tests
             Assert.Multiple(() => {
                 Assert.That(parsed?.Login,  Is.EqualTo(Vector.Input.Login));
                 Assert.That(parsed?.TOTP,   Is.EqualTo(Vector.Input.Totp));
-                Assert.That(parsed?.Type,   Is.EqualTo(AsType(Vector.Input.Tlscb)));
             });
 
         }
@@ -131,7 +124,6 @@ namespace cloud.charging.open.TOTP.Conformance.tests
             Assert.Multiple(() => {
                 Assert.That(parsed?.Login,  Is.EqualTo(Vector.Expected.Login));
                 Assert.That(parsed?.TOTP,   Is.EqualTo(Vector.Expected.Totp));
-                Assert.That(parsed?.Type,   Is.EqualTo(AsType(Vector.Expected.Tlscb)));
             });
 
         }

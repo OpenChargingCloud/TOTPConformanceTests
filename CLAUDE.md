@@ -67,8 +67,8 @@ Regenerating (after a generator change) additionally refreshes the vendored
 copies: append
 `--mirror libs/Hermod/HermodTests/TOTP/TestVectors --mirror libs/TOTP.TS/test/vectors`.
 
-Expected: C# 129 passed / 1 skipped (length-fractional, not representable in
-the UInt32 API), TS 95 passed / 24 skipped (the server verification vectors:
+Expected: C# 130 passed / 1 skipped (length-fractional, not representable in
+the UInt32 API), TS 95 passed / 25 skipped (the server verification vectors:
 `httpVerification` is Hermod-only, TOTP.ts is a client library; it does
 implement `tlsChannelBinding` and `httpAuthentication`). Skips are
 load-bearing, not noise. The verification vectors run against a live Hermod
